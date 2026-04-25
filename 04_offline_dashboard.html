@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CoolCycle — Local Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --card:     #1c2333;
+    --border:   #30363d;
+    --accent:   #00d4aa;
+    --warn:     #f0a500;
+    --danger:   #f85149;
+    --safe:     #3fb950;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --blue:     #58a6ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 12px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #0099dd);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .brand-text h1 { font-size: 15px; font-weight: 700; }
+  .brand-text p  { font-size: 11px; color: var(--muted); }
+  .time-display  { font-size: 12px; color: var(--muted); text-align: right; }
+  #clock         { font-size: 14px; font-weight: 600; color: var(--text); }
+
+  /* ── OFFLINE BANNER ── */
+  #offline-banner {
+    display: none;
+    background: linear-gradient(90deg, #3d1a00, #5c2a00);
+    border: 1px solid var(--warn);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--warn);
+    font-weight: 600;
+    align-items: center;
+    gap: 8px;
+  }
+  #offline-banner.show { display: flex; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .grid-1 { margin-bottom: 10px; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .3s;
+  }
+  .card.alarm { border-color: var(--danger); animation: pulse-border 1.5s infinite; }
+  .card.warn  { border-color: var(--warn); }
+  .card.safe  { border-color: var(--safe); }
+
+  @keyframes pulse-border {
+    0%,100% { border-color: var(--danger); }
+    50%      { border-color: #ff8080; }
+  }
+
+  .card-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .card-value {
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .card-unit  { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+  .card-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+  }
+  .dot-safe   { background: var(--safe); box-shadow: 0 0 6px var(--safe); }
+  .dot-warn   { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .dot-danger { background: var(--danger); box-shadow: 0 0 6px var(--danger);
+                animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  /* ── GAUGE ── */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+  .gauge-svg  { width: 100%; max-width: 160px; }
+
+  /* ── BAR ── */
+  .bar-track {
+    height: 10px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+    margin: 8px 0 4px;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width .5s ease, background .5s;
+  }
+
+  /* ── POWER FLOW ── */
+  .power-flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 8px 0;
+    gap: 6px;
+  }
+  .power-node {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+    flex: 1;
+  }
+  .power-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    transition: border-color .3s;
+  }
+  .power-icon.active  { border-color: var(--accent); box-shadow: 0 0 10px rgba(0,212,170,.25); }
+  .power-icon.warn    { border-color: var(--warn); }
+  .power-label { font-size: 10px; color: var(--muted); text-align: center; }
+  .power-val   { font-size: 12px; font-weight: 700; }
+  .flow-arrow  { font-size: 18px; color: var(--accent); animation: flow 1.2s infinite; flex: none; }
+  .flow-arrow.off { color: var(--border); animation: none; }
+  @keyframes flow { 0%,100% { opacity:.3; transform: translateX(-2px); }
+                    50%      { opacity:1;  transform: translateX(2px); } }
+
+  /* ── VACCINE INFO ── */
+  .vaccine-row { display: flex; justify-content: space-between; align-items: center;
+                 padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .vaccine-row:last-child { border-bottom: none; }
+  .vaccine-name { font-size: 13px; font-weight: 600; }
+  .vaccine-range{ font-size: 11px; color: var(--accent); }
+  .vaccine-stock{ font-size: 12px; color: var(--muted); }
+
+  /* ── SPARKLINE ── */
+  .spark-wrap { overflow: hidden; height: 50px; margin-top: 8px; }
+
+  /* ── SUPPORT BUTTON ── */
+  .support-btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #075e54, #128c7e);
+    border: none; border-radius: 12px;
+    color: #fff; font-family: 'Inter', sans-serif;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; text-decoration: none;
+    margin-bottom: 10px;
+    transition: opacity .2s, transform .1s;
+  }
+  .support-btn:active { opacity:.85; transform: scale(.98); }
+
+  /* ── LAST UPDATED ── */
+  .footer { text-align: center; font-size: 10px; color: var(--muted); padding: 8px 0; }
+
+  @media (max-width: 380px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="brand">
+    <div class="brand-icon">❄️</div>
+    <div class="brand-text">
+      <h1>CoolCycle</h1>
+      <p id="clinic-name">Loading clinic...</p>
+    </div>
+  </div>
+  <div class="time-display">
+    <div id="clock">--:--:--</div>
+    <div id="conn-status">● Connecting...</div>
+  </div>
+</header>
+
+<!-- OFFLINE BANNER -->
+<div id="offline-banner">
+  <span id="offline-msg">⚠️ Cloud Offline — Showing Local Data Only</span>
+</div>
+
+<!-- ROW 1: TEMP + BATTERY -->
+<div class="grid-2">
+
+  <!-- Temperature -->
+  <div class="card" id="temp-card">
+    <div class="card-label">🌡 Internal Temp</div>
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 160 100">
+        <path d="M 20 90 A 70 70 0 0 1 140 90" fill="none" stroke="#30363d" stroke-width="12" stroke-linecap="round"/>
+        <path id="gauge-arc" d="M 20 90 A 70 70 0 0 1 140 90" fill="none" stroke="#3fb950" stroke-width="12"
+              stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="220"/>
+        <text id="gauge-temp" x="80" y="85" text-anchor="middle" fill="#e6edf3" font-size="22" font-weight="900">--</text>
+        <text x="80" y="99" text-anchor="middle" fill="#8b949e" font-size="10">°C</text>
+      </svg>
+    </div>
+    <div class="card-sub" id="temp-status">—</div>
+  </div>
+
+  <!-- Battery -->
+  <div class="card" id="battery-card">
+    <div class="card-label">🔋 Battery</div>
+    <div class="card-value" id="batt-soc">--%</div>
+    <div class="bar-track">
+      <div class="bar-fill" id="batt-bar" style="width:0%;background:var(--safe)"></div>
+    </div>
+    <div class="card-sub" id="batt-detail">V: -- | A: --</div>
+    <div style="margin-top:8px">
+      <div class="card-label">⏱ Remaining Cool Time</div>
+      <div style="font-size:20px;font-weight:700" id="cool-time">-- hrs</div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 2: DOOR + SOLAR + HUMIDITY -->
+<div class="grid-3">
+  <div class="card" id="door-card">
+    <div class="card-label">🚪 Door</div>
+    <div style="font-size:28px;text-align:center;margin:6px 0" id="door-icon">❓</div>
+    <div class="card-sub" style="text-align:center" id="door-text">—</div>
+  </div>
+  <div class="card" id="solar-card">
+    <div class="card-label">☀️ Solar</div>
+    <div class="card-value" id="solar-power">-- W</div>
+    <div class="card-sub" id="solar-detail">V: -- | A: --</div>
+  </div>
+  <div class="card">
+    <div class="card-label">💧 Ambient</div>
+    <div class="card-value" id="ambient-temp">--<span class="card-unit">°C</span></div>
+    <div class="card-sub" id="humidity-val">Humidity: --%</div>
+  </div>
+</div>
+
+<!-- ROW 3: POWER FLOW -->
+<div class="grid-1">
+  <div class="card">
+    <div class="card-label">⚡ Power Flow</div>
+    <div class="power-flow">
+      <div class="power-node">
+        <div class="power-icon" id="pf-solar">☀️</div>
+        <div class="power-label">Solar Panel</div>
+        <div class="power-val" id="pf-solar-w">-- W</div>
+      </div>
+      <div class="flow-arrow" id="arrow1">→</div>
+      <div class="power-node">
+        <div class="power-icon" id="pf-battery">🔋</div>
+        <div class="power-label">Battery</div>
+        <div class="power-val" id="pf-batt-pct">--%</div>
+      </div>
+      <div class="flow-arrow" id="arrow2">→</div>
+      <div class="power-node">
+        <div class="power-icon" id="pf-fridge">❄️</div>
+        <div class="power-label">Cooler</div>
+        <div class="power-val" id="pf-comp">--</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 4: VACCINE PROFILE -->
+<div class="grid-1">
+  <div class="card">
+    <div class="card-label">💉 Vaccine Profile <span id="vaccine-sync-badge" style="color:var(--muted);font-size:9px;float:right"></span></div>
+    <div id="vaccine-list">
+      <div class="vaccine-row">
+        <span class="vaccine-name" id="vax-name">—</span>
+        <span class="vaccine-range" id="vax-range">—</span>
+        <span class="vaccine-stock" id="vax-stock">Stock: —</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 5: TEMP HISTORY SPARKLINE -->
+<div class="grid-1">
+  <div class="card">
+    <div class="card-label">📊 Temperature — Last 30 Readings</div>
+    <div class="spark-wrap">
+      <canvas id="sparkline" width="100%" height="50"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPORT BUTTON -->
+<a id="support-btn" class="support-btn" href="#">
+  📲 Call for Support (WhatsApp + GPS)
+</a>
+
+<div class="footer" id="last-update">Last update: —</div>
+
+<script>
+// ── CONFIGURATION (ESP32 serves this file, /api/status returns JSON) ──
+const API_URL      = '/api/status';
+const REFRESH_MS   = 5000;
+const SUPPORT_NUM  = '201001234567'; // fallback
+
+// ── STATE ──
+let tempHistory = [];
+let lastLat = null, lastLon = null;
+
+// ── CLOCK ──
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    n.toLocaleTimeString('en-GB');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── GAUGE ARC ──
+function setGauge(tempC, min, max) {
+  const pct  = Math.max(0, Math.min(1, (tempC - min + 2) / (max - min + 4)));
+  const total = 220;
+  const offset = total - (pct * total);
+  const arc = document.getElementById('gauge-arc');
+  arc.setAttribute('stroke-dashoffset', offset.toFixed(1));
+  let color = '#3fb950';
+  if (tempC < min || tempC > max) color = '#f85149';
+  else if (tempC < min + 0.5 || tempC > max - 0.5) color = '#f0a500';
+  arc.setAttribute('stroke', color);
+  document.getElementById('gauge-temp').textContent = tempC.toFixed(1);
+}
+
+// ── BATTERY BAR ──
+function setBattBar(soc) {
+  const bar = document.getElementById('batt-bar');
+  bar.style.width = soc + '%';
+  if (soc > 30) bar.style.background = 'var(--safe)';
+  else if (soc > 15) bar.style.background = 'var(--warn)';
+  else bar.style.background = 'var(--danger)';
+}
+
+// ── SPARKLINE ──
+function drawSparkline(data, tMin = 2.0, tMax = 8.0) {
+  const canvas = document.getElementById('sparkline');
+  canvas.width = canvas.parentElement.offsetWidth - 28;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (data.length < 2) return;
+  const min = Math.min(...data) - 0.5;
+  const max = Math.max(...data) + 0.5;
+  const w = canvas.width, h = canvas.height;
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * w,
+    y: h - ((v - min) / (max - min)) * h
+  }));
+  // Safe zone band
+  const safeTop = h - ((tMax - min) / (max - min)) * h;
+  const safeBot = h - ((tMin - min) / (max - min)) * h;
+  ctx.fillStyle = 'rgba(63,185,80,.1)';
+  ctx.fillRect(0, safeTop, w, safeBot - safeTop);
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = '#00d4aa';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Dots at danger points
+  pts.forEach((p, i) => {
+    const v = data[i];
+    if (v < tMin || v > tMax) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f85149';
+      ctx.fill();
+    }
+  });
+}
+
+// ── RENDER ──
+function render(d) {
+  const tMin = d.vaccine_temp_min ?? 2.0;
+  const tMax = d.vaccine_temp_max ?? 8.0;
+
+  // Cloud sync status
+  const banner = document.getElementById('offline-banner');
+  const msg = document.getElementById('offline-msg');
+  if (d.cloud_online) {
+    banner.classList.remove('show');
+  } else {
+    banner.classList.add('show');
+    const logs = d.offline_log_count ?? 0;
+    msg.textContent = `⚠️ Cloud Offline — ${logs} readings buffered locally`;
+  }
+
+  // Temperature gauge
+  setGauge(d.temp_internal ?? 0, tMin, tMax);
+  const tempCard = document.getElementById('temp-card');
+  const t = d.temp_internal ?? 0;
+  if (t < tMin || t > tMax) {
+    tempCard.className = 'card alarm';
+    document.getElementById('temp-status').innerHTML =
+      '<span class="status-dot dot-danger"></span>OUT OF RANGE';
+  } else if (t < tMin + 0.5 || t > tMax - 0.5) {
+    tempCard.className = 'card warn';
+    document.getElementById('temp-status').innerHTML =
+      '<span class="status-dot dot-warn"></span>Near threshold';
+  } else {
+    tempCard.className = 'card safe';
+    document.getElementById('temp-status').innerHTML =
+      '<span class="status-dot dot-safe"></span>Safe Range ' + tMin + '–' + tMax + '°C';
+  }
+
+  // Battery
+  const soc = d.battery_soc ?? 0;
+  document.getElementById('batt-soc').textContent = soc + '%';
+  setBattBar(soc);
+  document.getElementById('batt-detail').textContent =
+    'V: ' + (d.battery_voltage ?? '--') + ' | A: ' + (d.battery_current ?? '--');
+  const battCard = document.getElementById('battery-card');
+  battCard.className = soc < 15 ? 'card alarm' : soc < 30 ? 'card warn' : 'card';
+
+  // Cool time
+  document.getElementById('cool-time').textContent =
+    (d.remaining_cool_hours ?? '--') + ' hrs';
+
+  // Door
+  const doorOpen = d.door_open ?? false;
+  document.getElementById('door-icon').textContent = doorOpen ? '🔓' : '🔒';
+  document.getElementById('door-text').textContent  = doorOpen ? 'OPEN' : 'Closed';
+  const doorCard = document.getElementById('door-card');
+  doorCard.className = doorOpen ? 'card alarm' : 'card safe';
+
+  // Solar
+  const sp = d.solar_power ?? 0;
+  document.getElementById('solar-power').textContent = sp.toFixed(0) + ' W';
+  document.getElementById('solar-detail').textContent =
+    'V: ' + (d.solar_voltage ?? '--') + ' | A: ' + (d.solar_current ?? '--');
+  document.getElementById('solar-card').className = sp > 0 ? 'card safe' : 'card warn';
+
+  // Ambient
+  document.getElementById('ambient-temp').innerHTML =
+    (d.temp_ambient ?? '--') + '<span class="card-unit">°C</span>';
+  document.getElementById('humidity-val').textContent =
+    'Humidity: ' + (d.humidity ?? '--') + '%';
+
+  // Power flow animation
+  const solarActive = sp > 0;
+  const compOn = d.compressor_on ?? false;
+  document.getElementById('pf-solar').className = 'power-icon' + (solarActive ? ' active' : '');
+  document.getElementById('pf-battery').className = 'power-icon active';
+  document.getElementById('pf-fridge').className  = 'power-icon' + (compOn ? ' active' : '');
+  document.getElementById('arrow1').className = 'flow-arrow' + (solarActive ? '' : ' off');
+  document.getElementById('arrow2').className = 'flow-arrow' + (compOn ? '' : ' off');
+  document.getElementById('pf-solar-w').textContent = sp.toFixed(0) + ' W';
+  document.getElementById('pf-batt-pct').textContent = soc + '%';
+  document.getElementById('pf-comp').textContent = compOn ? 'ON' : 'Standby';
+
+  // Vaccine profile
+  document.getElementById('vax-name').textContent  = d.vaccine_name ?? 'N/A';
+  document.getElementById('vax-range').textContent = tMin + '°C – ' + tMax + '°C';
+  document.getElementById('vax-stock').textContent = 'Stock: ' + (d.vaccine_stock ?? '--');
+  document.getElementById('vaccine-sync-badge').textContent = d.profile_synced_at
+    ? '✓ Synced ' + new Date(d.profile_synced_at).toLocaleDateString()
+    : '⚠ Local only';
+
+  // Clinic name
+  if (d.clinic_name)
+    document.getElementById('clinic-name').textContent = d.clinic_name;
+
+  // GPS for support button
+  if (d.latitude && d.longitude) {
+    lastLat = d.latitude; lastLon = d.longitude;
+  }
+  const phone = d.alert_whatsapp ?? SUPPORT_NUM;
+  const gpsLink = lastLat
+    ? 'https://maps.google.com/?q=' + lastLat + ',' + lastLon
+    : 'Location unavailable';
+  const msg = encodeURIComponent(
+    '🆘 Support needed at ' + (d.clinic_name ?? 'clinic') + '\n' +
+    'Temp: ' + t + '°C | Battery: ' + soc + '%\n' +
+    'Location: ' + gpsLink
+  );
+  document.getElementById('support-btn').href =
+    'https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + msg;
+
+  // Sparkline
+  tempHistory.push(d.temp_internal ?? t);
+  if (tempHistory.length > 30) tempHistory.shift();
+  drawSparkline(tempHistory, tMin, tMax);
+
+  // Timestamp
+  document.getElementById('last-update').textContent =
+    'Last update: ' + new Date().toLocaleTimeString('en-GB');
+}
+
+// ── FETCH LOOP ──
+async function fetchStatus() {
+  try {
+    const res  = await fetch(API_URL, { cache: 'no-store' });
+    const data = await res.json();
+    document.getElementById('conn-status').style.color = 'var(--safe)';
+    document.getElementById('conn-status').textContent = '● Local';
+    render(data);
+  } catch (e) {
+    document.getElementById('offline-banner').classList.add('show');
+    document.getElementById('offline-msg').textContent = '⚠️ Cannot connect to CoolCycle unit';
+    document.getElementById('conn-status').style.color = 'var(--danger)';
+    document.getElementById('conn-status').textContent = '● No Data';
+  }
+}
+
+fetchStatus();
+setInterval(fetchStatus, REFRESH_MS);
+window.addEventListener('resize', () => {
+  // Re-draw sparkline with current history. Note: for simplicity we use default 2.0/8.0 on pure resize, 
+  // but it gets instantly corrected on the next 5s fetch tick.
+  drawSparkline(tempHistory, 2.0, 8.0);
+});
+</script>
+</body>
+</html>

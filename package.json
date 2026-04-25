@@ -1,0 +1,28 @@
+{
+  "name": "coolcycle-jwt-bridge",
+  "version": "1.0.0",
+  "description": "SSO bridge: coolcycle.com login → ThingsBoard PE JWT for CoolCycle IoT portal",
+  "main": "coolcycle_jwt_bridge.js",
+  "scripts": {
+    "start": "node coolcycle_jwt_bridge.js",
+    "dev": "nodemon coolcycle_jwt_bridge.js",
+    "test:unit": "node tests/jwt_bridge.test.js",
+    "test:integration": "node tests/mqtt_integration.test.js",
+    "test": "npm run test:unit && npm run test:integration"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mqtt": "^5.5.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["coolcycle", "thingsboard", "iot", "jwt", "sso"],
+  "license": "MIT"
+}

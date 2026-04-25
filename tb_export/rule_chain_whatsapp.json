@@ -1,0 +1,74 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle WhatsApp Alerts",
+    "type": "CORE",
+    "firstRuleNodeId": { "entityType": "RULE_NODE", "id": "node-enrich-wa" },
+    "root": false,
+    "debugMode": false
+  },
+  "metadata": {
+    "nodes": [
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-enrich-wa" },
+        "type": "org.thingsboard.rule.engine.enrichment.TbGetAttributesNode",
+        "name": "Fetch Alert Attrs",
+        "debugMode": false,
+        "configuration": {
+          "fetchToData": false,
+          "sharedAttributeNames": ["alert_whatsapp","clinic_name","clinic_lat","clinic_lon"]
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-build-msg" },
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "Build WhatsApp Message",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "var alarmType = metadata.alarmType != null ? metadata.alarmType : 'ALERT';\nvar clinic = metadata.clinic_name != null ? metadata.clinic_name : 'Unknown Clinic';\nvar temp = msg.temp_internal != null ? toFixed(msg.temp_internal, 1) + '°C' : 'N/A';\nvar batt = msg.battery_soc != null ? msg.battery_soc + '%' : 'N/A';\nvar lat = metadata.clinic_lat != null ? metadata.clinic_lat : (msg.latitude != null ? msg.latitude : '');\nvar lon = metadata.clinic_lon != null ? metadata.clinic_lon : (msg.longitude != null ? msg.longitude : '');\nvar mapsLink = (lat != '' && lon != '') ? 'https://maps.google.com/?q=' + lat + ',' + lon : 'Location unavailable';\nvar phone = metadata.alert_whatsapp != null ? metadata.alert_whatsapp : '';\nvar body = '🚨 CoolCycle ALERT\\nClinic: ' + clinic + '\\nIssue: ' + alarmType + '\\nTemp: ' + temp + '\\nBattery: ' + batt + '\\nLocation: ' + mapsLink;\nmsg.wa_to = 'whatsapp:+' + phone.replace(/\\D/g, '');\nmsg.wa_body = body;\nreturn {msg: msg, metadata: metadata, msgType: msgType};"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-twilio-rest" },
+        "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
+        "name": "Twilio REST — Send WhatsApp",
+        "debugMode": false,
+        "configuration": {
+          "restEndpointUrlPattern": "https://api.twilio.com/2010-04-01/Accounts/REPLACE_TWILIO_SID/Messages.json",
+          "requestMethod": "POST",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": "Basic REPLACE_WITH_BASE64_SID_AUTHTOKEN"
+          },
+          "useSimpleClientHttpFactory": false,
+          "bodyTemplate": "From=whatsapp:+14155238886&To=${msg.wa_to}&Body=${msg.wa_body}",
+          "parseToPlainText": false
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-log-success" },
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log WhatsApp Sent",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "return 'WhatsApp sent for alarm: ' + metadata.alarmType;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-log-fail" },
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log WhatsApp Failed",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "return 'WhatsApp FAILED for: ' + metadata.alarmType + ' | Error: ' + msg.error;"
+        }
+      }
+    ],
+    "connections": [
+      { "fromIndex": 0, "toIndex": 1, "type": "Success" },
+      { "fromIndex": 1, "toIndex": 2, "type": "Success" },
+      { "fromIndex": 2, "toIndex": 3, "type": "Success" },
+      { "fromIndex": 2, "toIndex": 4, "type": "Failure" }
+    ]
+  }
+}

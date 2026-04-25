@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CoolCycle — Vaccine Profile Manager</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+  :root{--bg:#0d1117;--surface:#161b22;--card:#1c2333;--border:#30363d;
+        --accent:#00d4aa;--danger:#f85149;--warn:#f0a500;--safe:#3fb950;
+        --text:#e6edf3;--muted:#8b949e;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:24px;}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;margin-top:12px;}
+  input,select{width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-size:14px;font-family:inherit;outline:none;}
+  input:focus,select:focus{border-color:var(--accent);}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .btn{padding:11px 20px;border-radius:8px;border:none;font-family:inherit;
+       font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+  .btn-primary{background:var(--accent);color:#000;}
+  .btn-danger{background:rgba(248,81,73,.15);color:var(--danger);border:1px solid var(--danger);}
+  .btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border);}
+  .btn:hover{opacity:.85;}
+  .actions{display:flex;gap:10px;margin-top:16px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:600;
+     font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+  td{padding:10px 12px;border-bottom:1px solid rgba(48,54,61,.5);}
+  tr:hover td{background:rgba(255,255,255,.03);}
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+  .badge-safe{background:rgba(63,185,80,.15);color:var(--safe);}
+  .badge-warn{background:rgba(240,165,0,.15);color:var(--warn);}
+  .action-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;}
+  .action-btn:hover{background:rgba(255,255,255,.07);}
+  #toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;
+         font-size:13px;font-weight:600;display:none;z-index:999;}
+  .toast-ok{background:#0d2818;border:1px solid var(--safe);color:var(--safe);}
+  .toast-err{background:#2d0f0e;border:1px solid var(--danger);color:var(--danger);}
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+            align-items:center;justify-content:center;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;
+         padding:24px;width:100%;max-width:480px;}
+  .modal h2{font-size:16px;margin-bottom:16px;}
+</style>
+</head>
+<body>
+
+<h1>💉 Vaccine Profile Manager</h1>
+<p class="sub">Customer Admin Dashboard — CoolCycle IoT Platform</p>
+
+<!-- LOGIN FORM (hidden once authenticated) -->
+<div class="card" id="login-card">
+  <h2 style="font-size:15px;margin-bottom:12px">Sign In</h2>
+  <label>Email</label>
+  <input type="email" id="login-email" placeholder="admin@clinic.eg"/>
+  <label>Password</label>
+  <input type="password" id="login-pass" placeholder="••••••••"/>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="doLogin()">Sign In →</button>
+  </div>
+  <p id="login-err" style="color:var(--danger);font-size:12px;margin-top:8px;display:none"></p>
+</div>
+
+<!-- MAIN CONTENT (shown after login) -->
+<div id="main" style="display:none">
+  <!-- Device Selector -->
+  <div class="card">
+    <label>Select CoolCycle Unit</label>
+    <select id="device-select" onchange="loadProfile()">
+      <option value="">Loading devices...</option>
+    </select>
+  </div>
+
+  <!-- Profile Table -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-weight:600;font-size:14px">Current Vaccine Profile</span>
+      <button class="btn btn-primary" style="padding:7px 14px;font-size:12px" onclick="openModal()">+ New Profile</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Vaccine</th><th>Min °C</th><th>Max °C</th><th>Stock</th><th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="profile-table-body">
+        <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">Select a device above</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Device Shared Attrs Display -->
+  <div class="card" id="device-info" style="display:none">
+    <div style="font-weight:600;font-size:13px;margin-bottom:10px">📡 Device Status</div>
+    <div class="row">
+      <div><span style="color:var(--muted);font-size:11px">CLINIC</span><br/><span id="inf-clinic" style="font-size:14px;font-weight:600">—</span></div>
+      <div><span style="color:var(--muted);font-size:11px">LAST SEEN</span><br/><span id="inf-lastseen" style="font-size:14px;font-weight:600">—</span></div>
+      <div><span style="color:var(--muted);font-size:11px">FW VERSION</span><br/><span id="inf-fw" style="font-size:14px;font-weight:600">—</span></div>
+      <div><span style="color:var(--muted);font-size:11px">TEMPERATURE</span><br/><span id="inf-temp" style="font-size:14px;font-weight:600">—</span></div>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn btn-secondary" style="font-size:12px" onclick="pushProfile()">📤 Push Profile to Device</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">Add Vaccine Profile</h2>
+    <input type="hidden" id="edit-index" value="-1"/>
+    <label>Vaccine Name</label>
+    <input type="text" id="f-name" placeholder="e.g. OPV, BCG, Hepatitis B"/>
+    <div class="row">
+      <div><label>Min Temp (°C)</label><input type="number" id="f-min" step="0.5" value="2"/></div>
+      <div><label>Max Temp (°C)</label><input type="number" id="f-max" step="0.5" value="8"/></div>
+    </div>
+    <label>Stock Count (vials)</label>
+    <input type="number" id="f-stock" value="0"/>
+    <label>WhatsApp Alert Number</label>
+    <input type="text" id="f-whatsapp" placeholder="+201001234567"/>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const BRIDGE_URL = 'http://localhost:3001';   // coolcycle_jwt_bridge.js URL
+const TB_BASE    = 'https://eu.thingsboard.cloud';
+
+let authToken   = '';
+let currentDeviceId = '';
+let profiles    = [];  // local list before pushing
+
+// ── Login ─────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass  = document.getElementById('login-pass').value;
+  try {
+    const res  = await fetch(`${BRIDGE_URL}/api/portal/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    authToken = data.token;
+    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('main').style.display       = 'block';
+    await loadDevices();
+  } catch(e) {
+    const el = document.getElementById('login-err');
+    el.textContent = e.message; el.style.display = 'block';
+  }
+}
+
+// ── Load Devices ──────────────────────────────────────────────────────────
+async function loadDevices() {
+  const res = await tbGet('/api/tenant/devices?pageSize=50&page=0');
+  if (!res.ok) return;
+  const data = await res.json();
+  const sel  = document.getElementById('device-select');
+  sel.innerHTML = '<option value="">— Select a unit —</option>';
+  (data.data || []).forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id.id;
+    opt.textContent = d.name + (d.label ? ` (${d.label})` : '');
+    sel.appendChild(opt);
+  });
+}
+
+// ── Load Profile ──────────────────────────────────────────────────────────
+async function loadProfile() {
+  currentDeviceId = document.getElementById('device-select').value;
+  if (!currentDeviceId) return;
+
+  // Fetch shared attributes
+  const res = await tbGet(
+    `/api/plugins/telemetry/DEVICE/${currentDeviceId}/values/attributes/SHARED_SCOPE`
+  );
+  if (!res.ok) return;
+  const attrs = await res.json();
+  const map = {};
+  attrs.forEach(a => map[a.key] = a.value);
+
+  // Fetch latest telemetry
+  const telRes = await tbGet(
+    `/api/plugins/telemetry/DEVICE/${currentDeviceId}/values/timeseries?keys=temp_internal,fw_version`
+  );
+  const telData = telRes.ok ? await telRes.json() : {};
+
+  // Populate device info
+  document.getElementById('device-info').style.display = 'block';
+  document.getElementById('inf-clinic').textContent   = map['clinic_name'] || '—';
+  document.getElementById('inf-fw').textContent       = (telData.fw_version||[{}])[0]?.value || '—';
+  document.getElementById('inf-temp').textContent     = ((telData.temp_internal||[{}])[0]?.value || '—') + ' °C';
+  document.getElementById('inf-lastseen').textContent = map['vaccine_name'] ? 'Active' : '—';
+
+  // Build profile table from shared attrs
+  profiles = [{
+    name:      map['vaccine_name']     || '',
+    min:       map['vaccine_temp_min'] ?? 2,
+    max:       map['vaccine_temp_max'] ?? 8,
+    stock:     map['vaccine_stock']    ?? 0,
+    whatsapp:  map['alert_whatsapp']   || ''
+  }];
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('profile-table-body');
+  if (profiles.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">No profile set</td></tr>';
+    return;
+  }
+  tbody.innerHTML = profiles.map((p,i) => `
+    <tr>
+      <td><strong>${p.name||'—'}</strong></td>
+      <td>${p.min}°C</td>
+      <td>${p.max}°C</td>
+      <td>${p.stock} vials</td>
+      <td><span class="badge badge-safe">Active</span></td>
+      <td>
+        <button class="action-btn" onclick="editProfile(${i})" title="Edit">✏️</button>
+        <button class="action-btn" onclick="deleteProfile(${i})" title="Delete">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+function openModal(idx=-1) {
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('modal-title').textContent = idx<0 ? 'Add Vaccine Profile' : 'Edit Profile';
+  document.getElementById('edit-index').value = idx;
+  if (idx>=0) {
+    const p=profiles[idx];
+    document.getElementById('f-name').value=p.name;
+    document.getElementById('f-min').value=p.min;
+    document.getElementById('f-max').value=p.max;
+    document.getElementById('f-stock').value=p.stock;
+    document.getElementById('f-whatsapp').value=p.whatsapp||'';
+  } else {
+    document.getElementById('f-name').value='';
+    document.getElementById('f-min').value=2;
+    document.getElementById('f-max').value=8;
+    document.getElementById('f-stock').value=0;
+    document.getElementById('f-whatsapp').value='';
+  }
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function editProfile(i) { openModal(i); }
+function deleteProfile(i) { profiles.splice(i,1); renderTable(); toast('Profile removed (not yet pushed)', false); }
+
+function saveProfile() {
+  const idx = parseInt(document.getElementById('edit-index').value);
+  const p = {
+    name:     document.getElementById('f-name').value.trim(),
+    min:      parseFloat(document.getElementById('f-min').value),
+    max:      parseFloat(document.getElementById('f-max').value),
+    stock:    parseInt(document.getElementById('f-stock').value),
+    whatsapp: document.getElementById('f-whatsapp').value.trim()
+  };
+  if (!p.name){ alert('Vaccine name required'); return; }
+  if (p.min >= p.max){ alert('Min must be less than Max'); return; }
+  if (idx<0) profiles.push(p); else profiles[idx]=p;
+  closeModal(); renderTable();
+  toast('Profile saved locally — click Push to apply to device');
+}
+
+// ── Push Profile to Device ────────────────────────────────────────────────
+async function pushProfile() {
+  if (!currentDeviceId || profiles.length===0) { toast('Select a device and add a profile first', true); return; }
+  const p = profiles[0];
+  const attrs = {
+    vaccine_name:     p.name,
+    vaccine_temp_min: p.min,
+    vaccine_temp_max: p.max,
+    vaccine_stock:    p.stock,
+    alert_whatsapp:   p.whatsapp
+  };
+  const res = await fetch(
+    `${TB_BASE}/api/plugins/telemetry/DEVICE/${currentDeviceId}/SHARED_SCOPE`,
+    { method:'POST', headers:{'Content-Type':'application/json','X-Authorization':'Bearer '+authToken},
+      body: JSON.stringify(attrs) }
+  );
+  if (res.ok) {
+    toast('✅ Profile pushed to device — it will sync within 60s');
+  } else {
+    toast('❌ Push failed: ' + res.status, true);
+  }
+}
+
+// ── TB API Helper ─────────────────────────────────────────────────────────
+function tbGet(path) {
+  return fetch(TB_BASE+path, { headers:{'X-Authorization':'Bearer '+authToken} });
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = err ? 'toast-err' : 'toast-ok';
+  el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 3500);
+}
+</script>
+</body>
+</html>

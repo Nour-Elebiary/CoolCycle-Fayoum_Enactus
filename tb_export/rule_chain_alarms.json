@@ -1,0 +1,200 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle Alarms",
+    "type": "CORE",
+    "firstRuleNodeId": { "entityType": "RULE_NODE", "id": "node-enrich-attrs" },
+    "root": false,
+    "debugMode": false
+  },
+  "metadata": {
+    "nodes": [
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-enrich-attrs" },
+        "type": "org.thingsboard.rule.engine.enrichment.TbGetAttributesNode",
+        "name": "Fetch Vaccine Profile & Clinic Attrs",
+        "debugMode": false,
+        "configuration": {
+          "fetchToData": false,
+          "clientAttributeNames": [],
+          "sharedAttributeNames": [
+            "vaccine_temp_min","vaccine_temp_max","clinic_lat","clinic_lon",
+            "geofence_radius_m","alert_whatsapp","clinic_name"
+          ],
+          "serverAttributeNames": []
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-temp-high-filter" },
+        "type": "org.thingsboard.rule.engine.filter.TbScriptFilterNode",
+        "name": "Filter: Temp High",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "var tMax = metadata.vaccine_temp_max != null ? parseFloat(metadata.vaccine_temp_max) : 8.0; return msg.temp_internal != null && msg.temp_internal > tMax;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-temp-low-filter" },
+        "type": "org.thingsboard.rule.engine.filter.TbScriptFilterNode",
+        "name": "Filter: Temp Low",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "var tMin = metadata.vaccine_temp_min != null ? parseFloat(metadata.vaccine_temp_min) : 2.0; return msg.temp_internal != null && msg.temp_internal < tMin;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-batt-critical-filter" },
+        "type": "org.thingsboard.rule.engine.filter.TbScriptFilterNode",
+        "name": "Filter: Battery Critical",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.battery_soc != null && msg.battery_soc < 15;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-door-filter" },
+        "type": "org.thingsboard.rule.engine.filter.TbScriptFilterNode",
+        "name": "Filter: Door Open > 60s",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.door_open == true && msg.door_open_secs != null && msg.door_open_secs > 60;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-geofence-filter" },
+        "type": "org.thingsboard.rule.engine.filter.TbScriptFilterNode",
+        "name": "Filter: Geofence Exit",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "if (!msg.gps_valid || metadata.clinic_lat == null) return false;\nvar homeLat = parseFloat(metadata.clinic_lat);\nvar homeLon = parseFloat(metadata.clinic_lon);\nvar fence = parseFloat(metadata.geofence_radius_m != null ? metadata.geofence_radius_m : '500');\nvar R = 6371000;\nvar dLat = (msg.latitude - homeLat) * Math.PI / 180;\nvar dLon = (msg.longitude - homeLon) * Math.PI / 180;\nvar a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(homeLat*Math.PI/180)*Math.cos(msg.latitude*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);\nvar dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\nreturn dist > fence;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarm-temp-high" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: High Temperature",
+        "debugMode": false,
+        "configuration": {
+          "severity": "CRITICAL",
+          "alarmType": "High Temperature",
+          "alarmDetailsBuildJs": "return {msg: {temp: msg.temp_internal, threshold: parseFloat(metadata.vaccine_temp_max)}, metadata: metadata, msgType: msgType};",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarm-temp-low" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Low Temperature",
+        "debugMode": false,
+        "configuration": {
+          "severity": "MAJOR",
+          "alarmType": "Low Temperature",
+          "propagate": true,
+          "propagateToOwner": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarm-batt" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Battery Critical",
+        "debugMode": false,
+        "configuration": {
+          "severity": "CRITICAL",
+          "alarmType": "Battery Critical",
+          "propagate": true,
+          "propagateToOwner": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarm-door" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Door Open",
+        "debugMode": false,
+        "configuration": {
+          "severity": "WARNING",
+          "alarmType": "Door Open",
+          "propagate": true,
+          "propagateToOwner": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarm-geofence" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Geofence Exit",
+        "debugMode": false,
+        "configuration": {
+          "severity": "CRITICAL",
+          "alarmType": "Geofence Exit",
+          "propagate": true,
+          "propagateToOwner": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-whatsapp-chain" },
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "WhatsApp Alert Chain",
+        "debugMode": false,
+        "configuration": { "ruleChainId": "REPLACE_WITH_WHATSAPP_CHAIN_ID" }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-prewarm-filter" },
+        "type": "org.thingsboard.rule.engine.filter.TbScriptFilterNode",
+        "name": "Filter: Pre-Warm Alert",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.remaining_cool_hours != null && msg.remaining_cool_hours < 12 && msg.solar_power != null && msg.solar_power == 0;"
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarm-prewarm" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Predictive Pre-Warm",
+        "debugMode": false,
+        "configuration": {
+          "severity": "MAJOR",
+          "alarmType": "Predictive Pre-Warm",
+          "propagate": true,
+          "propagateToOwner": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-delay-retry" },
+        "type": "org.thingsboard.rule.engine.delay.TbMsgDelayNode",
+        "name": "Delay 60s for Retry",
+        "debugMode": true,
+        "configuration": {
+          "periodInSeconds": 60,
+          "maxPendingMsgs": 1000
+        }
+      }
+    ],
+    "connections": [
+      { "fromIndex": 0, "toIndex": 1, "type": "Success" },
+      { "fromIndex": 0, "toIndex": 2, "type": "Success" },
+      { "fromIndex": 0, "toIndex": 3, "type": "Success" },
+      { "fromIndex": 0, "toIndex": 4, "type": "Success" },
+      { "fromIndex": 0, "toIndex": 5, "type": "Success" },
+      { "fromIndex": 1, "toIndex": 6, "type": "True" },
+      { "fromIndex": 2, "toIndex": 7, "type": "True" },
+      { "fromIndex": 3, "toIndex": 8, "type": "True" },
+      { "fromIndex": 4, "toIndex": 9, "type": "True" },
+      { "fromIndex": 5, "toIndex": 10, "type": "True" },
+      { "fromIndex": 6, "toIndex": 11, "type": "Created" },
+      { "fromIndex": 8, "toIndex": 11, "type": "Created" },
+      { "fromIndex": 10, "toIndex": 11, "type": "Created" },
+      { "fromIndex": 0, "toIndex": 12, "type": "Success" },
+      { "fromIndex": 12, "toIndex": 13, "type": "True" },
+      { "fromIndex": 13, "toIndex": 11, "type": "Created" },
+      { "fromIndex": 11, "toIndex": 14, "type": "Failure" },
+      { "fromIndex": 14, "toIndex": 11, "type": "Success" }
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle Root",
+    "type": "CORE",
+    "firstRuleNodeId": { "entityType": "RULE_NODE", "id": "node-msg-type-switch" },
+    "root": true,
+    "debugMode": false
+  },
+  "metadata": {
+    "nodes": [
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-msg-type-switch" },
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
+        "name": "Message Type Switch",
+        "debugMode": false,
+        "configuration": {}
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-save-ts" },
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+        "name": "Save Timeseries",
+        "debugMode": false,
+        "configuration": { "defaultTTL": 0 }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-save-attrs" },
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+        "name": "Save Client Attrs",
+        "debugMode": false,
+        "configuration": { "scope": "CLIENT_SCOPE" }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-alarms-chain" },
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "CoolCycle Alarms",
+        "debugMode": false,
+        "configuration": { "ruleChainId": "REPLACE_WITH_ALARM_CHAIN_ID" }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-offline-alarm" },
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Device Offline Alarm",
+        "debugMode": false,
+        "configuration": {
+          "severity": "MAJOR",
+          "alarmType": "Device Offline",
+          "alarmDetailsBuildJs": "return { msg: msg, metadata: metadata, msgType: 'ALARM' };",
+          "propagate": true,
+          "propagateToOwner": true
+        }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-online-save" },
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+        "name": "Save Online Status",
+        "debugMode": false,
+        "configuration": { "defaultTTL": 0 }
+      },
+      {
+        "id": { "entityType": "RULE_NODE", "id": "node-rpc-chain" },
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "RPC Handler",
+        "debugMode": false,
+        "configuration": { "ruleChainId": "REPLACE_WITH_RPC_CHAIN_ID" }
+      }
+    ],
+    "connections": [
+      { "fromIndex": 0, "toIndex": 1, "type": "Post telemetry" },
+      { "fromIndex": 1, "toIndex": 3, "type": "Success" },
+      { "fromIndex": 0, "toIndex": 2, "type": "Post attributes" },
+      { "fromIndex": 0, "toIndex": 6, "type": "RPC Request from Device" },
+      { "fromIndex": 0, "toIndex": 5, "type": "Activity Event" },
+      { "fromIndex": 0, "toIndex": 4, "type": "Inactivity Event" }
+    ]
+  }
+}
