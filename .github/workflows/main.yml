@@ -1,0 +1,60 @@
+name: CoolCycle CI/CD
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-backend:
+    name: Node.js Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run Unit and Integration Tests
+      env:
+        TB_HOST: "mqtt://demo.thingsboard.io"
+        TB_TOKEN: ${{ secrets.TEST_DEVICE_TOKEN }}
+      run: npm test
+
+  build-firmware:
+    name: Arduino Firmware Build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+
+    - name: Install ESP32 Core and Libraries
+      run: |
+        arduino-cli core update-index
+        arduino-cli core install esp32:esp32
+        arduino-cli lib install "DallasTemperature" "OneWire" "DHT sensor library" "Adafruit INA219" "RTClib" "BH1750" "TinyGPSPlus" "TinyGSM" "PubSubClient" "ArduinoJson" "ESPAsyncWebServer" "AsyncTCP" "WiFiManager"
+
+    - name: Compile coolcycle_firmware.ino
+      run: arduino-cli compile --fqbn esp32:esp32:esp32doit-devkit-v1 coolcycle_firmware.ino
+
+  deploy-portal:
+    name: Deploy Admin Portal (Placeholder)
+    needs: [test-backend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to Server
+      run: |
+        echo "Placeholder: Add Vercel, AWS ECS, or Heroku deployment CLI commands here."
+        # Example: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }}

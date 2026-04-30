@@ -1,0 +1,250 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle RPC Handler",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "root": false,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": null
+  },
+  "metadata": {
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
+        "name": "RPC Message Type Switch",
+        "debugMode": false,
+        "configuration": {},
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Is Vaccine Profile Update?",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.vaccine_name != null || msg.vaccine_temp_min != null || msg.vaccine_temp_max != null || msg.vaccine_stock != null || msg.clinic_lat != null || msg.clinic_lon != null || msg.geofence_radius_m != null || msg.alert_whatsapp != null || msg.clinic_name != null;",
+          "tbelScript": "return msg.vaccine_name != null || msg.vaccine_temp_min != null || msg.vaccine_temp_max != null || msg.vaccine_stock != null || msg.clinic_lat != null || msg.clinic_lon != null || msg.geofence_radius_m != null || msg.alert_whatsapp != null || msg.clinic_name != null;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "Transform: Build Shared Attribute Payload",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "var out = {};\nif (msg.vaccine_name != null)      out.vaccine_name      = msg.vaccine_name;\nif (msg.vaccine_temp_min != null)  out.vaccine_temp_min  = msg.vaccine_temp_min;\nif (msg.vaccine_temp_max != null)  out.vaccine_temp_max  = msg.vaccine_temp_max;\nif (msg.vaccine_stock != null)     out.vaccine_stock     = msg.vaccine_stock;\nif (msg.clinic_lat != null)        out.clinic_lat        = msg.clinic_lat;\nif (msg.clinic_lon != null)        out.clinic_lon        = msg.clinic_lon;\nif (msg.geofence_radius_m != null) out.geofence_radius_m = msg.geofence_radius_m;\nif (msg.alert_whatsapp != null)    out.alert_whatsapp    = msg.alert_whatsapp;\nif (msg.clinic_name != null)       out.clinic_name       = msg.clinic_name;\nreturn {msg: out, metadata: metadata, msgType: 'ATTRIBUTES_UPDATED'};"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+        "name": "Save Attributes: SHARED_SCOPE",
+        "debugMode": false,
+        "configuration": {
+          "scope": "SHARED_SCOPE"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.rpc.TbSendRPCRequestNode",
+        "name": "RPC: Notify Device pullVaccineProfile",
+        "debugMode": false,
+        "configuration": {
+          "timeoutInSeconds": 30,
+          "method": "pullVaccineProfile",
+          "body": "{}"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log: Profile Sync Success",
+        "debugMode": false,
+        "configuration": {
+          "defaultTTL": 0,
+          "jsScript": "return 'CoolCycle Profile Sync OK \u00e2\u2020\u2019 Device: ' + metadata.deviceName + ' | RPC: pullVaccineProfile sent';"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Is OTA Trigger RPC?",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.method != null && msg.method == 'triggerOTA';",
+          "tbelScript": "return msg.method != null && msg.method == 'triggerOTA';",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+        "name": "Save OTA Attributes: SHARED_SCOPE",
+        "debugMode": false,
+        "configuration": {
+          "scope": "SHARED_SCOPE"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "Transform: Build OTA Payload",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "var out = {};\nif (msg.fw_title != null)    out.fw_title    = msg.fw_title;\nif (msg.fw_version != null)  out.fw_version  = msg.fw_version;\nif (msg.fw_url != null)      out.fw_url      = msg.fw_url;\nif (msg.fw_checksum != null) out.fw_checksum = msg.fw_checksum;\nif (msg.fw_size != null)     out.fw_size     = msg.fw_size;\nreturn {msg: out, metadata: metadata, msgType: 'ATTRIBUTES_UPDATED'};"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log: Unhandled RPC",
+        "debugMode": true,
+        "configuration": {
+          "defaultTTL": 0,
+          "jsScript": "return 'CoolCycle RPC Handler: Unhandled RPC method \u00e2\u2020\u2019 ' + (msg.method != null ? msg.method : 'unknown') + ' from device ' + metadata.deviceName;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 450
+        }
+      }
+    ],
+    "connections": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Attributes Updated"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 6,
+        "type": "RPC Request from Device"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 2,
+        "type": "True"
+      },
+      {
+        "fromIndex": 2,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 3,
+        "toIndex": 4,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 4,
+        "toIndex": 5,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 7,
+        "type": "True"
+      },
+      {
+        "fromIndex": 7,
+        "toIndex": 8,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 9,
+        "type": "False"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 9,
+        "type": "False"
+      }
+    ],
+    "version": 5,
+    "firstNodeIndex": 0,
+    "ruleChainConnections": null
+  }
+}

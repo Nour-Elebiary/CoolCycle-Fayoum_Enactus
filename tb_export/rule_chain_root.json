@@ -1,0 +1,182 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle Root",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "root": false,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": null
+  },
+  "metadata": {
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
+        "name": "Message Type Switch",
+        "debugMode": false,
+        "configuration": {},
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+        "name": "Save Timeseries",
+        "debugMode": false,
+        "configuration": {
+          "defaultTTL": 0
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+        "name": "Save Client Attrs",
+        "debugMode": false,
+        "configuration": {
+          "scope": "CLIENT_SCOPE"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "CoolCycle Alarms",
+        "debugMode": false,
+        "configuration": {
+          "ruleChainId": "9fbec2ef-ccc5-4a14-a4d2-49e748ca9022"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Device Offline Alarm",
+        "debugMode": false,
+        "configuration": {
+          "severity": "MAJOR",
+          "alarmType": "Device Offline",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "propagate": true,
+          "propagateToOwner": true,
+          "alarmDetailsBuildTbel": "return { msg: msg, metadata: metadata, msgType: 'ALARM' };",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+        "name": "Save Online Status",
+        "debugMode": false,
+        "configuration": {
+          "defaultTTL": 0
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "RPC Handler",
+        "debugMode": false,
+        "configuration": {
+          "ruleChainId": "ecaf968b-ab19-4431-a925-e20ea8e9f8d4"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 350
+        }
+      }
+    ],
+    "connections": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 2,
+        "type": "Post attributes"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 6,
+        "type": "RPC Request from Device"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 6,
+        "type": "Attributes Updated"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 5,
+        "type": "Activity Event"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 4,
+        "type": "Inactivity Event"
+      }
+    ],
+    "version": 5,
+    "firstNodeIndex": 0,
+    "ruleChainConnections": null
+  }
+}

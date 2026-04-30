@@ -1,0 +1,462 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle Alarms",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "root": false,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": null
+  },
+  "metadata": {
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.enrichment.TbGetAttributesNode",
+        "name": "Fetch Vaccine Profile & Clinic Attrs",
+        "debugMode": false,
+        "configuration": {
+          "fetchToData": false,
+          "clientAttributeNames": [],
+          "sharedAttributeNames": [
+            "vaccine_temp_min",
+            "vaccine_temp_max",
+            "clinic_lat",
+            "clinic_lon",
+            "geofence_radius_m",
+            "alert_whatsapp",
+            "clinic_name"
+          ],
+          "serverAttributeNames": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Temp High",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "var tMax = metadata.vaccine_temp_max != null ? parseFloat(metadata.vaccine_temp_max) : 8.0; return msg.temp_internal != null && msg.temp_internal > tMax;",
+          "tbelScript": "var tMax = metadata.vaccine_temp_max != null ? parseFloat(metadata.vaccine_temp_max) : 8.0; return msg.temp_internal != null && msg.temp_internal > tMax;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Temp Low",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "var tMin = metadata.vaccine_temp_min != null ? parseFloat(metadata.vaccine_temp_min) : 2.0; return msg.temp_internal != null && msg.temp_internal < tMin;",
+          "tbelScript": "var tMin = metadata.vaccine_temp_min != null ? parseFloat(metadata.vaccine_temp_min) : 2.0; return msg.temp_internal != null && msg.temp_internal < tMin;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Battery Critical",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.battery_soc != null && msg.battery_soc < 15;",
+          "tbelScript": "return msg.battery_soc != null && msg.battery_soc < 15;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Door Open > 60s",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.door_open == true && msg.door_open_secs != null && msg.door_open_secs > 60;",
+          "tbelScript": "return msg.door_open == true && msg.door_open_secs != null && msg.door_open_secs > 60;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Geofence Exit",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "if (!msg.gps_valid || metadata.clinic_lat == null) return false;\nvar homeLat = parseFloat(metadata.clinic_lat);\nvar homeLon = parseFloat(metadata.clinic_lon);\nvar fence = parseFloat(metadata.geofence_radius_m != null ? metadata.geofence_radius_m : '500');\nvar R = 6371000;\nvar dLat = (msg.latitude - homeLat) * Math.PI / 180;\nvar dLon = (msg.longitude - homeLon) * Math.PI / 180;\nvar a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(homeLat*Math.PI/180)*Math.cos(msg.latitude*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);\nvar dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\nreturn dist > fence;",
+          "tbelScript": "if (!msg.gps_valid || metadata.clinic_lat == null) return false;\nvar homeLat = parseFloat(metadata.clinic_lat);\nvar homeLon = parseFloat(metadata.clinic_lon);\nvar fence = parseFloat(metadata.geofence_radius_m != null ? metadata.geofence_radius_m : '500');\nvar R = 6371000;\nvar dLat = (msg.latitude - homeLat) * Math.PI / 180;\nvar dLon = (msg.longitude - homeLon) * Math.PI / 180;\nvar a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(homeLat*Math.PI/180)*Math.cos(msg.latitude*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);\nvar dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\nreturn dist > fence;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: High Temperature",
+        "debugMode": false,
+        "configuration": {
+          "severity": "CRITICAL",
+          "alarmType": "High Temperature",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true,
+          "alarmDetailsBuildTbel": "return {msg: {temp: msg.temp_internal, threshold: parseFloat(metadata.vaccine_temp_max)}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Low Temperature",
+        "debugMode": false,
+        "configuration": {
+          "severity": "MAJOR",
+          "alarmType": "Low Temperature",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "alarmDetailsBuildTbel": "return {msg: {temp: msg.temp_internal, threshold: parseFloat(metadata.vaccine_temp_min)}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Battery Critical",
+        "debugMode": false,
+        "configuration": {
+          "severity": "CRITICAL",
+          "alarmType": "Battery Critical",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "alarmDetailsBuildTbel": "return {msg: {battery_soc: msg.battery_soc, threshold: 15}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Door Open",
+        "debugMode": false,
+        "configuration": {
+          "severity": "WARNING",
+          "alarmType": "Door Open",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "alarmDetailsBuildTbel": "return {msg: {door_open_secs: msg.door_open_secs}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 450
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Geofence Exit",
+        "debugMode": false,
+        "configuration": {
+          "severity": "CRITICAL",
+          "alarmType": "Geofence Exit",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "alarmDetailsBuildTbel": "return {msg: {latitude: msg.latitude, longitude: msg.longitude}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 450
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "WhatsApp Alert Chain",
+        "debugMode": false,
+        "configuration": {
+          "ruleChainId": "753db346-7bd7-49c9-a05c-4a11d301d16b"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 450
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Pre-Warm Alert",
+        "debugMode": false,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "script": "return msg.remaining_cool_hours != null && msg.remaining_cool_hours < 12 && msg.solar_power != null && msg.solar_power == 0;",
+          "tbelScript": "return msg.remaining_cool_hours != null && msg.remaining_cool_hours < 12 && msg.solar_power != null && msg.solar_power == 0;",
+          "jsScript": "return true;"
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 150,
+          "layoutY": 550
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Predictive Pre-Warm",
+        "debugMode": false,
+        "configuration": {
+          "severity": "MAJOR",
+          "alarmType": "Predictive Pre-Warm",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "scriptLang": "TBEL",
+          "propagate": true,
+          "propagateToOwner": true,
+          "alarmDetailsBuildTbel": "return {msg: {remaining_cool_hours: msg.remaining_cool_hours, solar_power: msg.solar_power}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "propagateToOwnerHierarchy": true,
+          "dynamicSeverity": false,
+          "relationTypes": []
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 400,
+          "layoutY": 550
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.delay.TbMsgDelayNode",
+        "name": "Delay 60s for Retry",
+        "debugMode": true,
+        "configuration": {
+          "periodInSeconds": 60,
+          "maxPendingMsgs": 1000
+        },
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 650,
+          "layoutY": 550
+        }
+      }
+    ],
+    "connections": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 2,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 4,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 5,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 6,
+        "type": "True"
+      },
+      {
+        "fromIndex": 2,
+        "toIndex": 7,
+        "type": "True"
+      },
+      {
+        "fromIndex": 3,
+        "toIndex": 8,
+        "type": "True"
+      },
+      {
+        "fromIndex": 4,
+        "toIndex": 9,
+        "type": "True"
+      },
+      {
+        "fromIndex": 5,
+        "toIndex": 10,
+        "type": "True"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 11,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 8,
+        "toIndex": 11,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 10,
+        "toIndex": 11,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 12,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 12,
+        "toIndex": 13,
+        "type": "True"
+      },
+      {
+        "fromIndex": 13,
+        "toIndex": 11,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 11,
+        "toIndex": 14,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 14,
+        "toIndex": 11,
+        "type": "Success"
+      }
+    ],
+    "version": 5,
+    "firstNodeIndex": 0,
+    "ruleChainConnections": null
+  }
+}

@@ -1,0 +1,414 @@
+{
+  "deviceProfile": {
+    "name": "coolcycle-unit",
+    "description": "CoolCycle Solar Medical Cold Chain Monitor \u00e2\u20ac\u201d ESP32-DevKit-V4",
+    "type": "DEFAULT",
+    "transportType": "MQTT",
+    "defaultRuleChainId": null,
+    "defaultDashboardId": null,
+    "defaultQueueName": "HighPriority",
+    "provisionType": "ALLOW_CREATE_NEW_DEVICES",
+    "provisionDeviceKey": "REPLACE_WITH_YOUR_PROVISION_KEY",
+    "profileData": {
+      "configuration": {
+        "type": "DEFAULT"
+      },
+      "transportConfiguration": {
+        "type": "MQTT",
+        "deviceTelemetryTopic": "v1/devices/me/telemetry",
+        "deviceAttributesTopic": "v1/devices/me/attributes",
+        "deviceAttributesSubscribeTopic": "v1/devices/me/attributes",
+        "deviceRpcRequestTopic": "v1/devices/me/rpc/request/+",
+        "deviceRpcResponseTopic": "v1/devices/me/rpc/response/$requestId"
+      },
+      "alarmRules": [
+        {
+          "alarmType": "High Temperature",
+          "createRules": {
+            "CRITICAL": {
+              "condition": {
+                "spec": {
+                  "type": "SIMPLE"
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "TIME_SERIES",
+                      "key": "temp_internal"
+                    },
+                    "valueType": "NUMERIC",
+                    "predicate": {
+                      "type": "NUMERIC",
+                      "operation": "GREATER",
+                      "value": {
+                        "userValue": null,
+                        "defaultValue": 8.0,
+                        "dynamicValue": {
+                          "sourceType": "CURRENT_DEVICE",
+                          "sourceAttribute": "vaccine_temp_max",
+                          "inherit": false
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "schedule": null,
+              "alarmDetails": "Internal temp ${temp_internal}\u00c2\u00b0C exceeds safe maximum",
+              "dashboardId": null
+            }
+          },
+          "clearRule": {
+            "condition": {
+              "spec": {
+                "type": "SIMPLE"
+              },
+              "condition": [
+                {
+                  "key": {
+                    "type": "TIME_SERIES",
+                    "key": "temp_internal"
+                  },
+                  "valueType": "NUMERIC",
+                  "predicate": {
+                    "type": "NUMERIC",
+                    "operation": "LESS_OR_EQUAL",
+                    "value": {
+                      "defaultValue": 8.0,
+                      "dynamicValue": {
+                        "sourceType": "CURRENT_DEVICE",
+                        "sourceAttribute": "vaccine_temp_max",
+                        "inherit": false
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true,
+          "propagateRelationTypes": null
+        },
+        {
+          "alarmType": "Low Temperature",
+          "createRules": {
+            "MAJOR": {
+              "condition": {
+                "spec": {
+                  "type": "SIMPLE"
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "TIME_SERIES",
+                      "key": "temp_internal"
+                    },
+                    "valueType": "NUMERIC",
+                    "predicate": {
+                      "type": "NUMERIC",
+                      "operation": "LESS",
+                      "value": {
+                        "defaultValue": 2.0,
+                        "dynamicValue": {
+                          "sourceType": "CURRENT_DEVICE",
+                          "sourceAttribute": "vaccine_temp_min",
+                          "inherit": false
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "alarmDetails": "Internal temp ${temp_internal}\u00c2\u00b0C below safe minimum"
+            }
+          },
+          "clearRule": {
+            "condition": {
+              "spec": {
+                "type": "SIMPLE"
+              },
+              "condition": [
+                {
+                  "key": {
+                    "type": "TIME_SERIES",
+                    "key": "temp_internal"
+                  },
+                  "valueType": "NUMERIC",
+                  "predicate": {
+                    "type": "NUMERIC",
+                    "operation": "GREATER_OR_EQUAL",
+                    "value": {
+                      "defaultValue": 2.0,
+                      "dynamicValue": {
+                        "sourceType": "CURRENT_DEVICE",
+                        "sourceAttribute": "vaccine_temp_min",
+                        "inherit": false
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true
+        },
+        {
+          "alarmType": "Battery Critical",
+          "createRules": {
+            "CRITICAL": {
+              "condition": {
+                "spec": {
+                  "type": "SIMPLE"
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "TIME_SERIES",
+                      "key": "battery_soc"
+                    },
+                    "valueType": "NUMERIC",
+                    "predicate": {
+                      "type": "NUMERIC",
+                      "operation": "LESS",
+                      "value": {
+                        "defaultValue": 15
+                      }
+                    }
+                  }
+                ]
+              },
+              "alarmDetails": "Battery SOC critically low: ${battery_soc}%"
+            },
+            "MAJOR": {
+              "condition": {
+                "spec": {
+                  "type": "SIMPLE"
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "TIME_SERIES",
+                      "key": "battery_soc"
+                    },
+                    "valueType": "NUMERIC",
+                    "predicate": {
+                      "type": "NUMERIC",
+                      "operation": "LESS",
+                      "value": {
+                        "defaultValue": 30
+                      }
+                    }
+                  }
+                ]
+              },
+              "alarmDetails": "Battery SOC low: ${battery_soc}%"
+            }
+          },
+          "clearRule": {
+            "condition": {
+              "spec": {
+                "type": "SIMPLE"
+              },
+              "condition": [
+                {
+                  "key": {
+                    "type": "TIME_SERIES",
+                    "key": "battery_soc"
+                  },
+                  "valueType": "NUMERIC",
+                  "predicate": {
+                    "type": "NUMERIC",
+                    "operation": "GREATER_OR_EQUAL",
+                    "value": {
+                      "defaultValue": 35
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true
+        },
+        {
+          "alarmType": "Door Open",
+          "createRules": {
+            "WARNING": {
+              "condition": {
+                "spec": {
+                  "type": "DURATION",
+                  "unit": "SECONDS",
+                  "value": 60
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "TIME_SERIES",
+                      "key": "door_open"
+                    },
+                    "valueType": "BOOLEAN",
+                    "predicate": {
+                      "type": "BOOLEAN",
+                      "operation": "EQUAL",
+                      "value": {
+                        "defaultValue": true
+                      }
+                    }
+                  }
+                ]
+              },
+              "alarmDetails": "Door has been open for ${door_open_secs} seconds"
+            }
+          },
+          "clearRule": {
+            "condition": {
+              "spec": {
+                "type": "SIMPLE"
+              },
+              "condition": [
+                {
+                  "key": {
+                    "type": "TIME_SERIES",
+                    "key": "door_open"
+                  },
+                  "valueType": "BOOLEAN",
+                  "predicate": {
+                    "type": "BOOLEAN",
+                    "operation": "EQUAL",
+                    "value": {
+                      "defaultValue": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": false
+        },
+        {
+          "alarmType": "Device Offline",
+          "createRules": {
+            "MAJOR": {
+              "condition": {
+                "spec": {
+                  "type": "DURATION",
+                  "unit": "MINUTES",
+                  "value": 5
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "ENTITY_FIELD",
+                      "key": "active"
+                    },
+                    "valueType": "BOOLEAN",
+                    "predicate": {
+                      "type": "BOOLEAN",
+                      "operation": "EQUAL",
+                      "value": {
+                        "defaultValue": false
+                      }
+                    }
+                  }
+                ]
+              },
+              "alarmDetails": "Device has been offline for more than 5 minutes"
+            }
+          },
+          "clearRule": {
+            "condition": {
+              "spec": {
+                "type": "SIMPLE"
+              },
+              "condition": [
+                {
+                  "key": {
+                    "type": "ENTITY_FIELD",
+                    "key": "active"
+                  },
+                  "valueType": "BOOLEAN",
+                  "predicate": {
+                    "type": "BOOLEAN",
+                    "operation": "EQUAL",
+                    "value": {
+                      "defaultValue": true
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true
+        },
+        {
+          "alarmType": "Low Vaccine Stock",
+          "createRules": {
+            "WARNING": {
+              "condition": {
+                "spec": {
+                  "type": "SIMPLE"
+                },
+                "condition": [
+                  {
+                    "key": {
+                      "type": "TIME_SERIES",
+                      "key": "vaccine_stock"
+                    },
+                    "valueType": "NUMERIC",
+                    "predicate": {
+                      "type": "NUMERIC",
+                      "operation": "LESS_OR_EQUAL",
+                      "value": {
+                        "defaultValue": 10
+                      }
+                    }
+                  }
+                ]
+              },
+              "alarmDetails": "Vaccine stock is running low (${vaccine_stock} units left)"
+            }
+          },
+          "clearRule": {
+            "condition": {
+              "spec": {
+                "type": "SIMPLE"
+              },
+              "condition": [
+                {
+                  "key": {
+                    "type": "TIME_SERIES",
+                    "key": "vaccine_stock"
+                  },
+                  "valueType": "NUMERIC",
+                  "predicate": {
+                    "type": "NUMERIC",
+                    "operation": "GREATER",
+                    "value": {
+                      "defaultValue": 20
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "propagate": true,
+          "propagateToOwner": true,
+          "propagateToTenant": true
+        }
+      ],
+      "provisionConfiguration": {
+        "type": "ALLOW_CREATE_NEW_DEVICES",
+        "provisionDeviceSecret": "REPLACE_WITH_YOUR_PROVISION_SECRET"
+      }
+    }
+  }
+}

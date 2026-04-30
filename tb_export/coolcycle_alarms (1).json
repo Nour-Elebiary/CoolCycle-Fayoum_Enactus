@@ -1,0 +1,630 @@
+{
+  "ruleChain": {
+    "name": "CoolCycle Alarms",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "root": false,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": null
+  },
+  "metadata": {
+    "version": 9,
+    "firstNodeIndex": 0,
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetAttributesNode",
+        "name": "Fetch Vaccine Profile & Clinic Attrs",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "tellFailureIfAbsent": true,
+          "fetchTo": "METADATA",
+          "clientAttributeNames": [],
+          "sharedAttributeNames": [
+            "vaccine_temp_min",
+            "vaccine_temp_max",
+            "clinic_lat",
+            "clinic_lon",
+            "geofence_radius_m",
+            "alert_whatsapp",
+            "clinic_name"
+          ],
+          "serverAttributeNames": [],
+          "latestTsKeyNames": [],
+          "getLatestValueWithTs": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 75,
+          "layoutY": 265
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Temp High",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "var tMax = metadata.vaccine_temp_max != null ? parseFloat(metadata.vaccine_temp_max) : 8.0; return msg.temp_internal != null && msg.temp_internal > tMax;"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 469,
+          "layoutY": 267
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Temp Low",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "var tMin = metadata.vaccine_temp_min != null ? parseFloat(metadata.vaccine_temp_min) : 2.0; return msg.temp_internal != null && msg.temp_internal < tMin;"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 448,
+          "layoutY": 347
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Battery Critical",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "return msg.battery_soc != null && msg.battery_soc < 15;"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 442,
+          "layoutY": 414
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Door Open > 60s",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "return msg.door_open == true && msg.door_open_secs != null && msg.door_open_secs > 60;"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 419,
+          "layoutY": 486
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Geofence Exit",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "if (!msg.gps_valid || metadata.clinic_lat == null) return false;\\nvar homeLat = parseFloat(metadata.clinic_lat);\\nvar homeLon = parseFloat(metadata.clinic_lon);\\nvar fence = parseFloat(metadata.geofence_radius_m != null ? metadata.geofence_radius_m : '500');\\nvar R = 6371000;\\nvar dLat = (msg.latitude - homeLat) * Math.PI / 180;\\nvar dLon = (msg.longitude - homeLon) * Math.PI / 180;\\nvar a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(homeLat*Math.PI/180)*Math.cos(msg.latitude*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);\\nvar dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\\nreturn dist > fence;"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 420,
+          "layoutY": 559
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: High Temperature",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    //remove prevAlarmDetails from metadata\n    delete metadata.prevAlarmDetails;\n    //now metadata is the same as it comes IN this rule node\n}\n\n\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {temp: msg.temp_internal, threshold: parseFloat(metadata.vaccine_temp_max)}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "High Temperature ",
+          "severity": "CRITICAL",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": true,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 776,
+          "layoutY": 189
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Low Temperature",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 0
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    //remove prevAlarmDetails from metadata\n    delete metadata.prevAlarmDetails;\n    //now metadata is the same as it comes IN this rule node\n}\n\n\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {temp: msg.temp_internal, threshold: parseFloat(metadata.vaccine_temp_min)}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Low Temperature ",
+          "severity": "MAJOR",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": false,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 732,
+          "layoutY": 274
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Battery Critical",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    //remove prevAlarmDetails from metadata\n    delete metadata.prevAlarmDetails;\n    //now metadata is the same as it comes IN this rule node\n}\n\n\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {battery_soc: msg.battery_soc, threshold: 15}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Battery Critical",
+          "severity": "CRITICAL",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": true,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 755,
+          "layoutY": 345
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Door Open",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    //remove prevAlarmDetails from metadata\n    delete metadata.prevAlarmDetails;\n    //now metadata is the same as it comes IN this rule node\n}\n\n\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {door_open_secs: msg.door_open_secs}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Door Open",
+          "severity": "WARNING",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": false,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 754,
+          "layoutY": 391
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Geofence Exit",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    //remove prevAlarmDetails from metadata\n    delete metadata.prevAlarmDetails;\n    //now metadata is the same as it comes IN this rule node\n}\n\n\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {latitude: msg.latitude, longitude: msg.longitude}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Geofence Exit",
+          "severity": "CRITICAL",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": false,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 754,
+          "layoutY": 446
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Pre-Warm Alert",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "return msg.remaining_cool_hours != null && msg.remaining_cool_hours < 12 && msg.solar_power != null && msg.solar_power == 0;"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 438,
+          "layoutY": 624
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Predictive Pre-Warm",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    //remove prevAlarmDetails from metadata\n    delete metadata.prevAlarmDetails;\n    //now metadata is the same as it comes IN this rule node\n}\n\n\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {remaining_cool_hours: msg.remaining_cool_hours, solar_power: msg.solar_power}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Predictive Pre-Warm",
+          "severity": "MAJOR",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": false,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 696,
+          "layoutY": 591
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetAttributesNode",
+        "name": "Fetch Alert Attrs",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 0
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "tellFailureIfAbsent": true,
+          "fetchTo": "METADATA",
+          "clientAttributeNames": [],
+          "sharedAttributeNames": [
+            "alert_whatsapp",
+            "clinic_name",
+            "clinic_lat",
+            "clinic_lon"
+          ],
+          "serverAttributeNames": [],
+          "latestTsKeyNames": [],
+          "getLatestValueWithTs": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1037,
+          "layoutY": 540
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "Build WhatsApp Message",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 0
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "",
+          "tbelScript": "var alarmType = metadata.alarmType != null ? metadata.alarmType : 'ALERT';\r\nvar clinic = metadata.clinic_name != null ? metadata.clinic_name : 'Unknown Clinic';\r\nvar temp = msg.temp_internal != null ? toFixed(msg.temp_internal, 1) + '°C' : 'N/A';\r\nvar batt = msg.battery_soc != null ? msg.battery_soc + '%' : 'N/A';\r\nvar lat = metadata.clinic_lat != null ? metadata.clinic_lat : (msg.latitude != null ? msg.latitude : '');\r\nvar lon = metadata.clinic_lon != null ? metadata.clinic_lon : (msg.longitude != null ? msg.longitude : '');\r\nvar mapsLink = (lat != '' && lon != '') ? 'https://maps.google.com/?q=' + lat + ',' + lon : 'Location unavailable';\r\n\r\nvar phone = metadata.alert_whatsapp != null ? metadata.alert_whatsapp : '';\r\n\r\n// Build the text message\r\nvar bodyText = \"🚨 CoolCycle ALERT\\n\" +\r\n               \"Clinic: \" + clinic + \"\\n\" +\r\n               \"Issue: \" + alarmType + \"\\n\" +\r\n               \"Temp: \" + temp + \"\\n\" +\r\n               \"Battery: \" + batt + \"\\n\" +\r\n               \"Location: \" + mapsLink;\r\n\r\n// URL Encode the variables for Twilio (application/x-www-form-urlencoded)\r\nvar fromParam = encodeURIComponent(\"whatsapp:+14155238886\"); // Change this if you have a different Twilio WhatsApp sender number\r\nvar toParam = encodeURIComponent(\"whatsapp:+\" + phone.replace(/\\D/g, ''));\r\nvar bodyParam = encodeURIComponent(bodyText);\r\n\r\n// Build the final payload string\r\nvar twilioPayload = \"From=\" + fromParam + \"&To=\" + toParam + \"&Body=\" + bodyParam;\r\n\r\n// Return the payload as a raw string\r\nreturn {msg: twilioPayload, metadata: metadata, msgType: msgType};\r\n"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1078,
+          "layoutY": 171
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
+        "name": "Twilio REST \\u00e2\\u20ac\\u201d Send WhatsApp",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 0
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "configuration": {
+          "restEndpointUrlPattern": "https://api.twilio.com/2010-04-01/Accounts/REPLACE_TWILIO_SID/Messages.json",
+          "requestMethod": "POST",
+          "useSimpleClientHttpFactory": false,
+          "parseToPlainText": true,
+          "ignoreRequestBody": false,
+          "enableProxy": false,
+          "useSystemProxyProperties": false,
+          "proxyScheme": null,
+          "proxyHost": null,
+          "proxyPort": 0,
+          "proxyUser": null,
+          "proxyPassword": null,
+          "readTimeoutMs": 0,
+          "maxParallelRequestsCount": 0,
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "credentials": {
+            "type": "basic",
+            "username": "REPLACE_TWILIO_SID",
+            "password": "REPLACE_TWILIO_AUTH_TOKEN"
+          },
+          "maxInMemoryBufferSizeInKb": 256
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1205,
+          "layoutY": 273
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log WhatsApp Sent",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 0
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "JS",
+          "jsScript": "return 'WhatsApp sent for alarm: ' + metadata.alarmType;",
+          "tbelScript": "return '\\nIncoming message:\\n' + JSON.stringify(msg) + '\\nIncoming metadata:\\n' + JSON.stringify(metadata);"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1350,
+          "layoutY": 181
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log WhatsApp Failed",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 0
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "JS",
+          "jsScript": "return 'WhatsApp FAILED for: ' + metadata.alarmType + ' | Error: ' + msg.error;",
+          "tbelScript": "return '\\nIncoming message:\\n' + JSON.stringify(msg) + '\\nIncoming metadata:\\n' + JSON.stringify(metadata);"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1230,
+          "layoutY": 424
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Compressor Overload",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return true;",
+          "tbelScript": "return msg.compressor_on == true && msg.duty_cycle != null && msg.duty_cycle > 0.8;"
+        },
+        "additionalInfo": {
+          "description": "Triggers if compressor runs >80% of time",
+          "layoutX": 450,
+          "layoutY": 700
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Compressor Overload",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {duty_cycle: msg.duty_cycle}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Compressor Overload",
+          "severity": "MAJOR",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": false,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 700,
+          "layoutY": 700
+        }
+      }
+    ],
+    "connections": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 2,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 4,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 5,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 11,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 18,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 6,
+        "type": "True"
+      },
+      {
+        "fromIndex": 2,
+        "toIndex": 7,
+        "type": "True"
+      },
+      {
+        "fromIndex": 3,
+        "toIndex": 8,
+        "type": "True"
+      },
+      {
+        "fromIndex": 4,
+        "toIndex": 9,
+        "type": "True"
+      },
+      {
+        "fromIndex": 5,
+        "toIndex": 10,
+        "type": "True"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 13,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 8,
+        "toIndex": 13,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 10,
+        "toIndex": 13,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 11,
+        "toIndex": 12,
+        "type": "True"
+      },
+      {
+        "fromIndex": 12,
+        "toIndex": 13,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 18,
+        "toIndex": 19,
+        "type": "True"
+      },
+      {
+        "fromIndex": 19,
+        "toIndex": 13,
+        "type": "Created"
+      },
+      {
+        "fromIndex": 13,
+        "toIndex": 14,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 14,
+        "toIndex": 15,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 15,
+        "toIndex": 16,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 15,
+        "toIndex": 17,
+        "type": "Failure"
+      }
+    ],
+    "ruleChainConnections": null
+  }
+}
