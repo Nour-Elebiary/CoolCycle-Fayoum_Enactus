@@ -55,14 +55,23 @@ architecture/
 
 ### Step 2 — Firmware Configuration
 
-1. Open `coolcycle_firmware.ino` in Arduino IDE.
-2. **Library Requirements**: Install `PubSubClient`, `ArduinoJson`, `DHT`, `DallasTemperature`, `WiFiManager`, etc.
-3. **Configure Token**:
+1. Open `coolcycle_firmware.ino` **and** `coolcycle_phase2_mqtt.ino` in Arduino IDE (both must be in the same sketch folder).
+2. **Library Requirements** (Arduino Library Manager / PlatformIO):
+   - `PubSubClient`, `ArduinoJson`, `DHT sensor library`, `DallasTemperature`, `OneWire`
+   - `Adafruit INA219`, `RTClib`, `Adafruit BH1750`, `TinyGPSPlus`
+   - `ESPAsyncWebServer`, `AsyncTCP`, `TinyGSM`
+   - ⚠️ `WiFiManager` is **Phase 1 only** — not needed when `PHASE2_ENABLED` is defined (default).
+3. **Configure Token** in `coolcycle_firmware.ino`:
    ```cpp
-   const char* TB_ACCESS_TOKEN = "99beqj10rezgdsfwkgvh"; // Your Device Token
+   const char* TB_ACCESS_TOKEN = "<YOUR_DEVICE_TOKEN>";
    ```
-4. **LittleFS Upload**: Upload `04_offline_dashboard.html` to ESP32 as `/index.html`.
-5. **Flash**: Once uploaded, check Serial Monitor. You should see "MQTT Connected".
+4. **WiFi Fallback Credentials** (in `coolcycle_phase2_mqtt.ino`):
+   ```cpp
+   #define FALLBACK_WIFI_SSID  "ADHAM1"
+   #define FALLBACK_WIFI_PASS  "RASLAN1"
+   ```
+5. **LittleFS Upload**: Upload `04_offline_dashboard.html` to ESP32 as `/index.html`.
+6. **Flash**: Open Serial Monitor (115200 baud). You should see either `[Connectivity] Online via GSM.` or `[Connectivity] Online via WiFi.`.
 
 ---
 
@@ -177,7 +186,7 @@ A Node.js/ThingsBoard JWT-backed dashboard for managing vaccine profiles.
 | Firmware IDE | Arduino Core for ESP32 |
 | Local storage | LittleFS |
 | Local server | ESPAsyncWebServer |
-| Cellular | SIM800L (TinyGSM) |
+| Cellular | SIM800L (TinyGSM) — GSM primary, WiFi fallback |
 | Cloud platform | ThingsBoard PE — Europe |
 | Cloud protocol | MQTT 3.1.1 (port 1883 / 8883 TLS) |
 | Rule scripting | TBEL (ThingsBoard Expression Language) |
@@ -194,6 +203,31 @@ A Node.js/ThingsBoard JWT-backed dashboard for managing vaccine profiles.
 - **Encrypted Placeholders:** All sensitive data in this repository (e.g., `TB_ACCESS_TOKEN`, `TWILIO_ACCOUNT_SID`, `PROVISION_KEY`) have been replaced with `<ENCRYPTED_...>` placeholders. Never commit actual API keys or credentials to version control. Use `.env` files for Node.js and external configuration files for Arduino.
 - **Hardware Security:** The ESP32 firmware is susceptible to physical flash extraction. For production deployments (>100 units), it is highly recommended to enable **ESP32 Flash Encryption and Secure Boot V2 (eFuse)** to prevent malicious actors from extracting the ThingsBoard MQTT credentials from the hardware.
 - **Communication Security:** The firmware enforces TLS over MQTT (Port 8883) using GlobalSign Root Certificates to ensure all telemetry and RPC commands are encrypted in transit over the cellular network.
+
+---
+
+## 📡 Connectivity Model
+
+The firmware uses a **GSM-primary / WiFi-fallback** state machine (v1.2.0+):
+
+```
+Boot
+ ├── Step 1: Try GSM (SIM800L) ─ up to 2 attempts
+ │      └── ✅ Success → MQTT over GPRS/TLS → done
+ │      └── ❌ Fail →
+ └── Step 2: Scan WiFi → look for "ADHAM1"
+        ├── Not found  → Serial error: "Target SSID not visible"
+        └── Found → Connect (max 3 attempts)
+               ├── Wrong password    → error, abort immediately
+               ├── Network vanished  → error, abort
+               ├── Timeout/refused   → retry up to 3×, then error
+               └── ✅ Connected → MQTT over WiFi (port 1883) → done
+
+All fail → Boxed NO INTERNET error on Serial → offline mode
+```
+
+During runtime (`loopPhase2`), if the active transport drops it automatically
+attempts to restore it, then crosses over to the other transport if restore fails.
 
 ---
 

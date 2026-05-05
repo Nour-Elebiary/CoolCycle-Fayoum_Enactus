@@ -73,21 +73,41 @@ TinyGsm        modem(modemSerial);
 TinyGsmClientSecure  gsmClient(modem);
 PubSubClient   mqttClient(gsmClient);
 
-// ── State ──────────────────────────────────────────────────────────────────
-bool  modemReady   = false;
-bool  gprsReady    = false;
+// ── WiFi Fallback Credentials ─────────────────────────────────────────────
+#define FALLBACK_WIFI_SSID    "ADHAM1"
+#define FALLBACK_WIFI_PASS    "RASLAN1"
+#define FALLBACK_WIFI_MAX_TRY  3   // max WiFi attempts before giving up
+#define GSM_MAX_INIT_TRIES     2   // max GSM init attempts before WiFi fallback
+
+// ── Connection State Machine ──────────────────────────────────────────────
+enum class ConnState { OFFLINE, GSM_ACTIVE, WIFI_ACTIVE, FAILED };
+ConnState connState = ConnState::OFFLINE;
+
+// ── State ─────────────────────────────────────────────────────────────────
+bool  modemReady = false;
+bool  gprsReady  = false;
+bool  usingWifi  = false;   // true when WiFi fallback is active
 unsigned long t_mqtt_pub = 0;
 unsigned long t_mqtt_chk = 0;
 #define INTERVAL_MQTT_PUB  30000
 #define INTERVAL_MQTT_CHK   5000
 
-// ── Forward declarations ───────────────────────────────────────────────────
+// ── WiFi MQTT objects (used when GSM is unavailable) ──────────────────────
+WiFiClient   wifiMqttClient;
+PubSubClient wifiMqttPub(wifiMqttClient);
+
+// ── Helper: returns whichever MQTT client is currently active ─────────────
+PubSubClient& getActiveMqtt() { return usingWifi ? wifiMqttPub : mqttClient; }
+
+// ── Forward declarations ──────────────────────────────────────────────────
 void onMqttMessage(char* topic, byte* payload, unsigned int len);
 void publishTelemetry();
 void requestSharedAttributes();
 void handleSharedAttrs(JsonObject& attrs);
 void replayOfflineLog();
 void triggerOTA(const String& url, const String& checksum);
+bool tryConnectWiFi();
+bool connectWiFiMQTT();
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  MODEM INIT
@@ -198,7 +218,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int len) {
     if (method == "pullVaccineProfile") {
       // Already handled by shared attr subscription — just ACK
       String resp = "{\"result\":\"profile already synced via attributes\"}";
-      mqttClient.publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
+      getActiveMqtt().publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
 
     } else if (method == "checkFirmware") {
       // OTA: fw_url and fw_checksum come as params
@@ -212,18 +232,18 @@ void onMqttMessage(char* topic, byte* payload, unsigned int len) {
 
     } else if (method == "getStatus") {
       // Return current status JSON as RPC response
-      mqttClient.publish((TB_RPC_RESP_PREFIX + reqId).c_str(),
+      getActiveMqtt().publish((TB_RPC_RESP_PREFIX + reqId).c_str(),
                          buildStatusJson().c_str());
 
     } else if (method == "setBuzzer") {
       bool state = doc["params"]["state"] | false;
       digitalWrite(PIN_BUZZER, state ? HIGH : LOW);
       String resp = "{\"result\":\"ok\"}";
-      mqttClient.publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
+      getActiveMqtt().publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
       
     } else if (method == "reboot") {
       String resp = "{\"result\":\"rebooting\"}";
-      mqttClient.publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
+      getActiveMqtt().publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
       delay(1000);
       ESP.restart();
       
@@ -235,7 +255,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int len) {
         f.close();
       }
       String resp = "{\"log_size_bytes\":" + String(bytes) + "}";
-      mqttClient.publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
+      getActiveMqtt().publish((TB_RPC_RESP_PREFIX + reqId).c_str(), resp.c_str());
     }
   }
 }
@@ -291,14 +311,15 @@ void requestSharedAttributes() {
                     "vaccine_temp_max,vaccine_stock,clinic_name,clinic_lat,"
                     "clinic_lon,geofence_radius_m,alert_whatsapp,"
                     "fw_title,fw_version,fw_url,fw_checksum\"}";
-  mqttClient.publish(TB_ATTR_REQ_TOPIC, req);
+  getActiveMqtt().publish(TB_ATTR_REQ_TOPIC, req);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  PUBLISH TELEMETRY TO THINGSBOARD
 // ═══════════════════════════════════════════════════════════════════════════
 void publishTelemetry() {
-  if (!mqttClient.connected()) return;
+  PubSubClient& mc = getActiveMqtt();
+  if (!mc.connected()) return;
 
   // Use DS3231 timestamp for accurate time even if NTP unavailable
   uint64_t ts = 0;
@@ -331,7 +352,7 @@ void publishTelemetry() {
 
   char buf[768];
   serializeJson(doc, buf);
-  bool ok = mqttClient.publish(TB_TELEMETRY_TOPIC, buf, false);
+  bool ok = mc.publish(TB_TELEMETRY_TOPIC, buf, false);
   if (ok) {
     Serial.println("[MQTT] Telemetry published");
   } else {
@@ -349,16 +370,17 @@ void replayOfflineLog() {
   if (!f) return;
 
   int count = 0;
-  while (f.available() && mqttClient.connected()) {
+  PubSubClient& mc = getActiveMqtt();
+  while (f.available() && mc.connected()) {
     String line = f.readStringUntil('\n');
     line.trim();
     if (line.length() == 0) continue;
 
     // Each line is a self-contained JSON with "ts" field — publish directly
-    bool ok = mqttClient.publish(TB_TELEMETRY_TOPIC, line.c_str(), false);
+    bool ok = mc.publish(TB_TELEMETRY_TOPIC, line.c_str(), false);
     if (ok) count++;
-    delay(100);  // Throttle to avoid flooding TB
-    mqttClient.loop();
+    delay(100);
+    mc.loop();
   }
   f.close();
 
@@ -376,7 +398,7 @@ void publishOTAState(const char* state) {
   doc["fw_state"] = state;
   char buf[64];
   serializeJson(doc, buf);
-  mqttClient.publish(TB_ATTRIBUTES_TOPIC, buf);
+  getActiveMqtt().publish(TB_ATTRIBUTES_TOPIC, buf);
   Serial.printf("[OTA] State: %s\n", state);
 }
 
@@ -433,47 +455,192 @@ void triggerOTA(const String& url, const String& expectedChecksum) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  PHASE 2 SETUP — call this AFTER Phase 1 setup() completes
+//  WIFI FALLBACK — scan → connect → error reporting
 // ═══════════════════════════════════════════════════════════════════════════
-void setupPhase2() {
-  Serial.println("[Phase2] Initializing cellular + cloud...");
-  if (initModem()) {
-    connectMQTT();
-  } else {
-    Serial.println("[Phase2] Modem failed — running in offline mode");
-    td.cloud_online = false;
+bool tryConnectWiFi() {
+  Serial.println("[WiFi] Scanning for target network...");
+  int n = WiFi.scanNetworks();
+  bool found = false;
+  for (int i = 0; i < n; i++) {
+    if (WiFi.SSID(i) == FALLBACK_WIFI_SSID) { found = true; break; }
   }
+  WiFi.scanDelete();
+
+  if (!found) {
+    Serial.printf("[WiFi] ERROR: Network '%s' not found in scan (%d networks visible).\n",
+                  FALLBACK_WIFI_SSID, n);
+    Serial.println("[WiFi] NO INTERNET — Target SSID is not visible. Check router power.");
+    return false;
+  }
+
+  Serial.printf("[WiFi] Network '%s' found. Trying to connect (max %d attempts)...\n",
+                FALLBACK_WIFI_SSID, FALLBACK_WIFI_MAX_TRY);
+
+  for (int attempt = 1; attempt <= FALLBACK_WIFI_MAX_TRY; attempt++) {
+    Serial.printf("[WiFi] Attempt %d/%d...\n", attempt, FALLBACK_WIFI_MAX_TRY);
+    WiFi.disconnect(true);
+    WiFi.begin(FALLBACK_WIFI_SSID, FALLBACK_WIFI_PASS);
+
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 12000) {
+      delay(300); Serial.print(".");
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+      return true;
+    }
+
+    // Diagnose and decide whether to retry
+    wl_status_t st = WiFi.status();
+    if (st == WL_WRONG_PASSWORD) {
+      Serial.println("[WiFi] ERROR: Wrong password for '" FALLBACK_WIFI_SSID "'. Aborting retries.");
+      break;  // Retrying with wrong password is pointless
+    } else if (st == WL_NO_SSID_AVAIL) {
+      Serial.println("[WiFi] ERROR: Network '" FALLBACK_WIFI_SSID "' disappeared mid-connect.");
+      break;
+    } else {
+      Serial.printf("[WiFi] Connection refused/timeout (status=%d).", st);
+      if (attempt < FALLBACK_WIFI_MAX_TRY) Serial.println(" Retrying...");
+      else Serial.println();
+    }
+    delay(1500);
+  }
+
+  Serial.println("[WiFi] NO INTERNET — Could not connect to '" FALLBACK_WIFI_SSID "' after all attempts.");
+  return false;
+}
+
+// ── WiFi MQTT connect (port 1883, unencrypted — WiFi LAN is trusted) ───────
+bool connectWiFiMQTT() {
+  wifiMqttPub.setServer(TB_HOST, TB_PORT);   // TB_PORT = 1883 from main firmware
+  wifiMqttPub.setCallback(onMqttMessage);
+  wifiMqttPub.setBufferSize(2048);
+  wifiMqttPub.setKeepAlive(60);
+
+  Serial.printf("[MQTT/WiFi] Connecting to %s:%d...\n", TB_HOST, TB_PORT);
+  if (!wifiMqttPub.connect(DEVICE_ID, TB_ACCESS_TOKEN, nullptr)) {
+    Serial.printf("[MQTT/WiFi] Failed, rc=%d\n", wifiMqttPub.state());
+    return false;
+  }
+  wifiMqttPub.subscribe(TB_ATTR_RESP_TOPIC);
+  wifiMqttPub.subscribe(TB_ATTR_SUB_TOPIC);
+  wifiMqttPub.subscribe(TB_RPC_REQ_TOPIC);
+  requestSharedAttributes();
+  td.cloud_online = true;
+  Serial.println("[MQTT/WiFi] Connected to ThingsBoard via WiFi.");
+  replayOfflineLog();
+  return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  PHASE 2 LOOP — call this inside loop() AFTER Phase 1 tasks
+//  PHASE 2 SETUP — GSM (primary) → WiFi (fallback) state machine
+// ═══════════════════════════════════════════════════════════════════════════
+void setupPhase2() {
+  Serial.println("[Connectivity] Starting GSM → WiFi fallback sequence...");
+  usingWifi = false;
+
+  // ── Step 1: Try GSM up to GSM_MAX_INIT_TRIES times ──────────────────────
+  bool gsmOK = false;
+  for (int attempt = 1; attempt <= GSM_MAX_INIT_TRIES; attempt++) {
+    Serial.printf("[GSM] Init attempt %d/%d...\n", attempt, GSM_MAX_INIT_TRIES);
+    if (initModem()) {
+      if (connectMQTT()) {
+        connState = ConnState::GSM_ACTIVE;
+        Serial.println("[Connectivity] Online via GSM.");
+        gsmOK = true;
+        return;
+      }
+      Serial.println("[GSM] GPRS OK but MQTT failed.");
+    } else {
+      Serial.printf("[GSM] Init attempt %d failed.\n", attempt);
+    }
+    if (attempt < GSM_MAX_INIT_TRIES) delay(2000);
+  }
+
+  if (!gsmOK) {
+    Serial.printf("[GSM] No connection after %d attempts — switching to WiFi fallback.\n",
+                  GSM_MAX_INIT_TRIES);
+  }
+
+  // ── Step 2: WiFi fallback ────────────────────────────────────────────────
+  if (tryConnectWiFi()) {
+    if (connectWiFiMQTT()) {
+      connState = ConnState::WIFI_ACTIVE;
+      usingWifi = true;
+      Serial.println("[Connectivity] Online via WiFi.");
+      return;
+    }
+    Serial.println("[WiFi] MQTT connect failed — no internet path to ThingsBoard.");
+  }
+
+  // ── All paths exhausted ──────────────────────────────────────────────────
+  connState       = ConnState::FAILED;
+  td.cloud_online = false;
+  Serial.println("\n╔══════════════════════════════════════════════════╗");
+  Serial.println(  "║          NO INTERNET CONNECTION                  ║");
+  Serial.println(  "║  GSM : no SIM / network / GPRS failure           ║");
+  Serial.println(  "║  WiFi: '" FALLBACK_WIFI_SSID "' unreachable or refused    ║");
+  Serial.println(  "║  Device running in OFFLINE mode.                 ║");
+  Serial.println(  "╚══════════════════════════════════════════════════╝\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHASE 2 LOOP — maintains whichever connection is active
 // ═══════════════════════════════════════════════════════════════════════════
 void loopPhase2() {
   unsigned long now = millis();
+  PubSubClient& activeMqtt = getActiveMqtt();
 
-  // ── Maintain MQTT connection ──────────────────────────────────────────
+  // ── Maintain MQTT connection ──────────────────────────────────────────────
   if (now - t_mqtt_chk >= INTERVAL_MQTT_CHK) {
     t_mqtt_chk = now;
-    if (!mqttClient.connected()) {
+
+    if (!activeMqtt.connected()) {
       td.cloud_online = false;
       Serial.println("[MQTT] Disconnected — attempting reconnect...");
-      // Check GPRS still alive
-      if (!modem.isGprsConnected()) {
-        Serial.println("[GPRS] Lost — reconnecting...");
-        modem.gprsConnect(APN, GPRS_USER, GPRS_PASS);
+
+      if (!usingWifi) {
+        // GSM path: restore GPRS then MQTT
+        if (!modem.isGprsConnected()) {
+          Serial.println("[GPRS] Lost — reconnecting...");
+          if (!modem.gprsConnect(APN, GPRS_USER, GPRS_PASS)) {
+            // GPRS gone; try WiFi fallback
+            Serial.println("[GSM] GPRS restore failed — trying WiFi fallback...");
+            if (tryConnectWiFi() && connectWiFiMQTT()) {
+              connState = ConnState::WIFI_ACTIVE;
+              usingWifi = true;
+            }
+            return;
+          }
+        }
+        connectMQTT();
+      } else {
+        // WiFi path: reconnect WiFi then MQTT
+        if (WiFi.status() != WL_CONNECTED) {
+          Serial.println("[WiFi] Lost connection — reconnecting...");
+          if (!tryConnectWiFi()) {
+            // WiFi gone; try GSM
+            Serial.println("[WiFi] Reconnect failed — trying GSM...");
+            if (initModem() && connectMQTT()) {
+              connState = ConnState::GSM_ACTIVE;
+              usingWifi = false;
+            }
+            return;
+          }
+        }
+        connectWiFiMQTT();
       }
-      connectMQTT();
     } else {
       td.cloud_online = true;
     }
-    mqttClient.loop();
+    activeMqtt.loop();
   }
 
-  // ── Publish telemetry every 30s ───────────────────────────────────────
+  // ── Publish telemetry every 30 s ──────────────────────────────────────────
   if (now - t_mqtt_pub >= INTERVAL_MQTT_PUB) {
     t_mqtt_pub = now;
-    if (mqttClient.connected()) {
-      publishTelemetry();
-    }
+    if (activeMqtt.connected()) publishTelemetry();
   }
 }

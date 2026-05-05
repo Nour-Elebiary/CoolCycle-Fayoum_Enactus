@@ -159,23 +159,37 @@ WiFi.begin(CLINIC_SSID, CLINIC_PASS);
 11. Configure White Labeling: CoolCycle branding
 ```
 
-### 2.2 Cellular (SIM800L) Firmware Module
+### 2.2 Connectivity State Machine (v1.2.0)
 
+The firmware uses a **GSM-primary / WiFi-fallback** approach managed by `setupPhase2()` and `loopPhase2()` in `coolcycle_phase2_mqtt.ino`.
+
+**Boot sequence:**
+```
+1. Try GSM (SIM800L UART1: RX=25, TX=26) — up to 2 attempts
+   ✔ Success → MQTT via TinyGSM (GPRS/TLS port 8883)
+   ✘ Both fail → proceed to WiFi
+
+2. WiFi scan → search for SSID "ADHAM1"
+   Not found → Serial: "Target SSID not visible" → offline
+   Found → connect with password "RASLAN1" (max 3 attempts)
+     Wrong password → abort immediately, error message
+     Timeout/refused → retry up to 3×, error message
+   ✔ Connected → MQTT via WiFiClient (port 1883)
+
+3. All fail → NO INTERNET boxed error on Serial → offline mode
+   (LittleFS logging continues; data replayed when reconnected)
+```
+
+**Runtime reconnection** (`loopPhase2`, every 5 s):
+- If GSM MQTT drops → restore GPRS → if GPRS fails → try WiFi fallback
+- If WiFi MQTT drops → reconnect WiFi → if WiFi fails → try GSM
+
+**Key constants (edit in `coolcycle_phase2_mqtt.ino`):**
 ```cpp
-// SIM800L initialization sequence (UART1: RX=25, TX=26)
-void initCellular() {
-  Serial1.begin(9600, SERIAL_8N1, 25, 26); // RX=25, TX=26
-  sendAT("AT", 1000);           // Check alive
-  sendAT("AT+CPIN?", 2000);     // Check SIM
-  sendAT("AT+CREG?", 2000);     // Network registration
-  sendAT("AT+CGATT=1", 5000);   // Attach GPRS
-  sendAT("AT+CSTT=\"data.vodafone.net.eg\"", 2000); // APN (Vodafone Egypt)
-  sendAT("AT+CIICR", 5000);     // Bring up wireless
-  sendAT("AT+CIFSR", 2000);     // Get IP
-}
-// GPS is on UART2: Serial2.begin(9600, SERIAL_8N1, 16, 17) — handled by gpsSerial(2)
-// Then use AT+CIPSTART to open TCP to thingsboard.cloud:1883
-// and forward MQTT packets manually via AT+CIPSEND
+#define FALLBACK_WIFI_SSID    "ADHAM1"   // Target WiFi SSID
+#define FALLBACK_WIFI_PASS    "RASLAN1"  // WiFi password
+#define FALLBACK_WIFI_MAX_TRY  3         // WiFi connection attempts
+#define GSM_MAX_INIT_TRIES     2         // GSM init attempts
 ```
 
 ### 2.3 Shared Attribute Subscription (Vaccine Profile Pull)
@@ -201,6 +215,10 @@ void onSharedAttrUpdate(JsonObject attrs) {
 ```
 
 ### Phase 2 Test Criteria
+- [ ] Serial Monitor shows `[Connectivity] Online via GSM.` when SIM is inserted
+- [ ] If SIM removed/fails, Serial shows GSM fail messages then `[WiFi] Network 'ADHAM1' found`
+- [ ] Serial shows `[Connectivity] Online via WiFi.` after successful WiFi fallback
+- [ ] If neither available, boxed `NO INTERNET CONNECTION` error appears on Serial
 - [ ] Device appears ACTIVE on ThingsBoard with all telemetry keys visible
 - [ ] Alarm fires on ThingsBoard when probe is warmed above 8°C
 - [ ] WhatsApp message received within 30s of alarm trigger

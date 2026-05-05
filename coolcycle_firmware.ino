@@ -36,7 +36,9 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <esp_task_wdt.h>
+#ifndef PHASE2_ENABLED
 #include <WiFiManager.h>
+#endif
 #include <Preferences.h>
 
 // Sensors
@@ -584,10 +586,14 @@ void setup() {
 
   gpsSerial.begin(9600, SERIAL_8N1, 16, 17);
 
+#ifndef PHASE2_ENABLED
+  // Phase 1 only: use WiFiManager captive portal
   WiFiManager wm;
   wm.setConnectTimeout(20);
   if (!wm.autoConnect(AP_SSID)) Serial.println("[WiFi] Failed to connect, running in AP mode");
   else                          Serial.printf("[WiFi] Connected: %s\n", WiFi.localIP().toString().c_str());
+#endif
+  // Phase 2: connectivity is handled entirely by setupPhase2() below (GSM → WiFi fallback)
 
 #ifndef PHASE2_ENABLED
   mqttClient.setServer(TB_HOST, TB_PORT);
@@ -620,8 +626,10 @@ void loop() {
       unsigned long btn_start = millis();
       while(digitalRead(PIN_CONFIG_BTN) == LOW) { esp_task_wdt_reset(); delay(10); }
       if (millis() - btn_start > 5000) {
+#ifndef PHASE2_ENABLED
         WiFiManager wm;
         wm.resetSettings();
+#endif
         ESP.restart();
       } else {
         digitalWrite(PIN_BUZZER, LOW);
