@@ -15,12 +15,29 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
+const fs      = require('fs');
+const path    = require('path');
 
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: 'https://coolcycle.com' }));
 
 const TB_BASE = process.env.TB_BASE_URL || 'https://eu.thingsboard.cloud';
+const ASSIGNMENTS_FILE = path.join(__dirname, 'assignments.json');
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function getAssignments() {
+  if (!fs.existsSync(ASSIGNMENTS_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(ASSIGNMENTS_FILE, 'utf8'));
+  } catch (err) {
+    return [];
+  }
+}
+
+function saveAssignments(assignments) {
+  fs.writeFileSync(ASSIGNMENTS_FILE, JSON.stringify(assignments, null, 2));
+}
 
 // ── Dashboard IDs per role (set these after creating dashboards in TB) ──
 const DASHBOARD_IDS = {
@@ -114,6 +131,61 @@ app.post('/api/portal/refresh', async (req, res) => {
  */
 app.get('/api/portal/health', (req, res) => {
   res.json({ status: 'ok', tbBase: TB_BASE });
+});
+
+// ── Assignments API (ThingsBoard Integration) ─────────────────────────────
+
+/**
+ * POST /api/portal/assignments
+ * Receives assignment webhook from ThingsBoard Rule Engine
+ */
+app.post('/api/portal/assignments', (req, res) => {
+  const { deviceId, deviceName, customerId, customerName, publicLink } = req.body;
+  
+  if (!deviceId || !customerId) {
+    return res.status(400).json({ error: 'deviceId and customerId required' });
+  }
+
+  const assignments = getAssignments();
+  const existingIndex = assignments.findIndex(a => a.deviceId === deviceId && a.customerId === customerId);
+  
+  const assignmentData = {
+    deviceId,
+    deviceName,
+    customerId,
+    customerName,
+    publicLink: publicLink || '',
+    assignedAt: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    assignments[existingIndex] = assignmentData;
+  } else {
+    assignments.push(assignmentData);
+  }
+
+  saveAssignments(assignments);
+  console.log(`[CoolCycle Bridge] Saved assignment: ${deviceName} -> ${customerName}`);
+  
+  return res.json({ status: 'success' });
+});
+
+/**
+ * GET /api/portal/assignments
+ * Returns all assignments (for Admin Portal)
+ */
+app.get('/api/portal/assignments', (req, res) => {
+  res.json(getAssignments());
+});
+
+/**
+ * GET /api/portal/user-data/:customerId
+ * Returns assignments for a specific user
+ */
+app.get('/api/portal/user-data/:customerId', (req, res) => {
+  const assignments = getAssignments();
+  const userAssignments = assignments.filter(a => a.customerId === req.params.customerId);
+  res.json(userAssignments);
 });
 
 const PORT = process.env.PORT || 3001;

@@ -283,6 +283,9 @@ uint8_t temprature_sens_read();
 }
 #endif
 
+void setupPhase2();
+void loopPhase2();
+
 // ─────────────────────────────────────────────
 //  SOC ESTIMATION (Coulomb Counting)
 // ─────────────────────────────────────────────
@@ -304,8 +307,8 @@ void updateBatterySOC() {
   static bool was_low = false;
   if (td.battery_soc < 20) was_low = true;
   if (was_low && td.battery_soc > 80) {
-    charge_cycle_count++;
-    prefs.putInt("cycles", charge_cycle_count);
+    td.charge_cycle_count++;
+    prefs.putInt("cycles", td.charge_cycle_count);
     was_low = false;
   }
 }
@@ -569,7 +572,7 @@ void setup() {
   
   loadLastGPS();
   prefs.begin("coolcycle", false);
-  charge_cycle_count = prefs.getInt("cycles", 0);
+  td.charge_cycle_count = prefs.getInt("cycles", 0);
   
   esp_task_wdt_init(60, true);
   esp_task_wdt_add(NULL);

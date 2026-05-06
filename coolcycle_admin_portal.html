@@ -107,6 +107,24 @@
       <button class="btn btn-secondary" style="font-size:12px" onclick="pushProfile()">📤 Push Profile to Device</button>
     </div>
   </div>
+
+  <!-- User Assignments Display -->
+  <div class="card" id="assignments-card" style="margin-top: 16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-weight:600;font-size:14px">User Device Assignments</span>
+      <button class="btn btn-secondary" style="padding:7px 14px;font-size:12px" onclick="loadAssignments()">🔄 Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th><th>Device</th><th>Assigned At</th><th>Dashboard Link</th>
+        </tr>
+      </thead>
+      <tbody id="assignments-table-body">
+        <tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ADD/EDIT MODAL -->
@@ -157,6 +175,7 @@ async function doLogin() {
     document.getElementById('login-card').style.display = 'none';
     document.getElementById('main').style.display       = 'block';
     await loadDevices();
+    await loadAssignments();
   } catch(e) {
     const el = document.getElementById('login-err');
     el.textContent = e.message; el.style.display = 'block';
@@ -176,6 +195,36 @@ async function loadDevices() {
     opt.textContent = d.name + (d.label ? ` (${d.label})` : '');
     sel.appendChild(opt);
   });
+}
+
+// ── Load Assignments ──────────────────────────────────────────────────────
+async function loadAssignments() {
+  const tbody = document.getElementById('assignments-table-body');
+  try {
+    const res = await fetch(`${BRIDGE_URL}/api/portal/assignments`);
+    if (!res.ok) throw new Error('Failed to fetch');
+    const data = await res.json();
+    
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">No assignments found</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = data.map(a => `
+      <tr>
+        <td><strong>${a.customerName || a.customerId}</strong></td>
+        <td>${a.deviceName || a.deviceId}</td>
+        <td>${new Date(a.assignedAt).toLocaleDateString()}</td>
+        <td>
+          ${a.publicLink 
+            ? `<a href="${a.publicLink}" target="_blank" style="color:var(--accent);text-decoration:none">Open Dashboard ↗</a>` 
+            : '<span style="color:var(--muted)">No public link</span>'}
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger);text-align:center;padding:20px">Error loading assignments</td></tr>`;
+  }
 }
 
 // ── Load Profile ──────────────────────────────────────────────────────────

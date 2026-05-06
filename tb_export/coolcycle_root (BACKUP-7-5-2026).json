@@ -9,12 +9,12 @@
     "additionalInfo": null
   },
   "metadata": {
-    "version": 5,
+    "version": 7,
     "firstNodeIndex": 0,
     "nodes": [
       {
         "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
-        "name": "Message Type Switch 2",
+        "name": "Message Type Switch",
         "debugSettings": null,
         "singletonMode": false,
         "queueName": null,
@@ -144,7 +144,7 @@
         "configurationVersion": 1,
         "configuration": {
           "forwardMsgToDefaultRuleChain": false,
-          "ruleChainId": "739b0f80-415a-11f1-bfc4-25a208a27468"
+          "ruleChainId": "c99178e0-4171-11f1-bfc4-25a208a27468"
         },
         "additionalInfo": {
           "description": "",

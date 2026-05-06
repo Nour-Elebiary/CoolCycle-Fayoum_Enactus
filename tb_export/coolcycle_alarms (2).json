@@ -9,7 +9,7 @@
     "additionalInfo": null
   },
   "metadata": {
-    "version": 8,
+    "version": 2,
     "firstNodeIndex": 0,
     "nodes": [
       {
@@ -349,8 +349,8 @@
         },
         "additionalInfo": {
           "description": "",
-          "layoutX": 1720,
-          "layoutY": 554
+          "layoutX": 1037,
+          "layoutY": 540
         }
       },
       {
@@ -371,8 +371,8 @@
         },
         "additionalInfo": {
           "description": "",
-          "layoutX": 1892,
-          "layoutY": 632
+          "layoutX": 1078,
+          "layoutY": 171
         }
       },
       {
@@ -413,8 +413,8 @@
         },
         "additionalInfo": {
           "description": "",
-          "layoutX": 2122,
-          "layoutY": 758
+          "layoutX": 1205,
+          "layoutY": 273
         }
       },
       {
@@ -435,8 +435,8 @@
         },
         "additionalInfo": {
           "description": "",
-          "layoutX": 2398,
-          "layoutY": 529
+          "layoutX": 1350,
+          "layoutY": 181
         }
       },
       {
@@ -457,8 +457,54 @@
         },
         "additionalInfo": {
           "description": "",
-          "layoutX": 2462,
-          "layoutY": 855
+          "layoutX": 1230,
+          "layoutY": 424
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: Compressor Overload",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return true;",
+          "tbelScript": "return msg.compressor_on == true && msg.duty_cycle != null && msg.duty_cycle > 0.8;"
+        },
+        "additionalInfo": {
+          "description": "Triggers if compressor runs >80% of time",
+          "layoutX": 450,
+          "layoutY": 700
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+        "name": "Alarm: Compressor Overload",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "alarmDetailsBuildJs": "var details = {};\nif (metadata.prevAlarmDetails) {\n    details = JSON.parse(metadata.prevAlarmDetails);\n    delete metadata.prevAlarmDetails;\n}\nreturn details;",
+          "alarmDetailsBuildTbel": "return {msg: {duty_cycle: msg.duty_cycle}, metadata: metadata, msgType: msgType};",
+          "useMessageAlarmData": false,
+          "overwriteAlarmDetails": false,
+          "alarmType": "Compressor Overload",
+          "severity": "MAJOR",
+          "propagate": true,
+          "relationTypes": [],
+          "propagateToOwner": true,
+          "propagateToOwnerHierarchy": true,
+          "propagateToTenant": false,
+          "dynamicSeverity": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 700,
+          "layoutY": 700
         }
       }
     ],
@@ -491,6 +537,11 @@
       {
         "fromIndex": 0,
         "toIndex": 11,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 18,
         "type": "Success"
       },
       {
@@ -562,6 +613,16 @@
         "fromIndex": 15,
         "toIndex": 17,
         "type": "Failure"
+      },
+      {
+        "fromIndex": 18,
+        "toIndex": 19,
+        "type": "True"
+      },
+      {
+        "fromIndex": 19,
+        "toIndex": 13,
+        "type": "Created"
       }
     ],
     "ruleChainConnections": null

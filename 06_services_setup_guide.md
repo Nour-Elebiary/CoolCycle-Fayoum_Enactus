@@ -171,6 +171,18 @@ Follow this exact order to avoid dependency issues:
        Fill TB_ACCESS_TOKEN from /config/device.json on LittleFS
        Uncomment setupPhase2() and loopPhase2() in firmware
        Flash → device connects and pushes telemetry
+
+□ 13. Enable Iframe Embedding for CoolCycle Website:
+       Go to System Settings → Security Settings
+       Add `https://coolcycle.com` to allowed X-Frame-Options
+       Add `frame-ancestors 'self' https://coolcycle.com;` to CSP
+
+□ 14. Setup Public Dashboard Link (For User Portal Integration):
+       Go to Dashboards → Select the Tier 3 Clinic Staff Dashboard
+       Click "Make Public" (icon with the globe)
+       Copy the Public Link generated
+       Go to Customers → "El Nazla Health Unit" → Attributes → Server attributes
+       Add new String attribute: key=`public_dashboard_link`, value=`<Pasted Public Link>`
 ```
 
 ---

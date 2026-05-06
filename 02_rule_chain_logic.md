@@ -17,11 +17,25 @@ The primary entry point for all device communication. It handles data persistenc
     ├─ "Post Attributes"     ──→ [Save Client Attrs]
     ├─ "RPC from Device"     ──→ [Rule Chain: RPC Handler]
     ├─ "Activity Event"      ──→ [Save TS: {online: true}]
-    └─ "Inactivity Event"    ──→ [Save TS: {online: false}]
-                                     ↓
-                              [Create Alarm: "Device Offline" MAJOR]
-                                     ↓
-                              [REST API Call: WhatsApp Alert]
+    ├─ "Inactivity Event"    ──→ [Save TS: {online: false}]
+    │                                ↓
+    │                         [Create Alarm: "Device Offline" MAJOR]
+    │                                ↓
+    │                         [REST API Call: WhatsApp Alert]
+    └─ "Entity Assigned"     ──→ [Fetch Public Link] ──→ [Format Payload] ──→ [REST API: Bridge]
+```
+
+### TBEL: Format Assignment Payload
+```java
+// Formats the payload to send to the CoolCycle JWT Bridge
+var payload = {
+    deviceId: metadata.entityId,
+    deviceName: metadata.entityName,
+    customerId: metadata.assignedCustomerId,
+    customerName: metadata.assignedCustomerName,
+    publicLink: metadata.ss_public_dashboard_link != null ? metadata.ss_public_dashboard_link : ''
+};
+return {msg: payload, metadata: metadata, msgType: msgType};
 ```
 
 **Telemetry Keys Published by Firmware:**

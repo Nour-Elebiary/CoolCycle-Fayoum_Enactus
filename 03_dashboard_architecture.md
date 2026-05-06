@@ -184,8 +184,9 @@ User Group: "Clinic Staff — El Nazla"
 
 ---
 
-## coolcycle.com → ThingsBoard JWT/SSO Bridge
+## CoolCycle Website Integrations
 
+### 1. JWT/SSO Login Flow (Admin Portal)
 ### Flow
 ```
 [User logs in at coolcycle.com]
@@ -219,3 +220,21 @@ Response:
 
 Use the `token` as `X-Authorization: Bearer {token}` for all subsequent API calls.
 
+### 2. Embedded Public Dashboard Flow (User Portal)
+```text
+[Admin assigns Device to Customer in ThingsBoard]
+    ↓
+[Rule Engine detects assignment & reads "public_dashboard_link" from Customer Attributes]
+    ↓
+[Rule Engine POSTs assignment to CoolCycle JWT Bridge]
+    ↓
+[User logs into coolcycle.com User Portal]
+    ↓
+[Portal fetches assignment and embeds Public Dashboard Link via <iframe>]
+```
+
+> [!IMPORTANT]
+> **Public Link Setup Requirements**:
+> 1. The dashboard intended for the user must be explicitly marked as **Public** in ThingsBoard.
+> 2. The Customer entity must have a server attribute named `public_dashboard_link` containing this public URL.
+> 3. ThingsBoard must be configured to allow iframe embedding on the `coolcycle.com` domain via `X-Frame-Options` or CSP headers.
